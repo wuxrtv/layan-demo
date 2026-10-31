@@ -1,34 +1,119 @@
 // Данные магазина. Чтобы поменять товары, цены или тексты — правьте этот файл.
 //
 // Фото: в демо стоят бесплатные фото с Unsplash (указан ID фото). Для своих фото
-// можно писать вместо ID полный путь или ссылку: 'photos/hoodie.jpg' или 'https://...'.
+// можно писать вместо ID полный путь или ссылку: 'photos/dress.jpg' или 'https://...'.
 //   colors[].photo — главное фото конкретного цвета
 //   photos         — дополнительные фото товара (галерея)
 
 window.STORE = {
-  brand: 'USLUB',
+  brand: 'LAYAN',
+  logo: { full: 'assets/logo-full.webp', mark: 'assets/logo-mark.webp', icon: 'assets/logo-icon.webp' },
   currency: { ru: 'сум', uz: "so'm" },
   delivery: { fee: 25000, freeFrom: 500000 },
-  banner: '1769981281734-4d8cf9fe7b75',
+  banner: '1756982477754-2c05a288f4db',
 
   categories: [
     { id: 'all', ru: 'Все', uz: 'Hammasi' },
+    { id: 'women', ru: 'Женщинам', uz: 'Ayollar', photo: '1616313253719-c46514cddee1' },
+    { id: 'men', ru: 'Мужчинам', uz: 'Erkaklar', photo: '1624835567150-0c530a20d8cc' },
+    { id: 'kids', ru: 'Детям', uz: 'Bolalar', photo: '1615863712239-becde744591a' },
     { id: 'sale', ru: 'Скидки', uz: 'Chegirmalar' },
-    { id: 'tshirt', ru: 'Футболки', uz: 'Futbolkalar' },
-    { id: 'hoodie', ru: 'Худи и кофты', uz: 'Xudi va koftalar' },
-    { id: 'jacket', ru: 'Куртки', uz: 'Kurtkalar' },
-    { id: 'jeans', ru: 'Джинсы', uz: 'Jinsilar' },
-    { id: 'shoes', ru: 'Обувь', uz: 'Poyabzal' },
-    { id: 'acc', ru: 'Аксессуары', uz: 'Aksessuarlar' },
   ],
 
   products: [
+    // ---------- женщинам ----------
     {
-      id: 'tee-basic', cat: 'tshirt', tags: ['new'],
+      id: 'w-dress', cat: 'women', tags: ['new'],
+      name: { ru: 'Платье макси с длинным рукавом', uz: 'Uzun yengli maksi ko\'ylak' },
+      desc: {
+        ru: 'Струящееся платье в пол из вискозы. Закрытый крой, мягкий пояс по талии.',
+        uz: "Viskozadan oqib turuvchi uzun ko'ylak. Yopiq bichim, belida yumshoq kamar.",
+      },
+      price: 459000,
+      colors: [
+        { hex: '#3b3b38', ru: 'Цветочный принт', uz: 'Gulli print', photo: '1616313253719-c46514cddee1' },
+        { hex: '#bcd3cf', ru: 'Мятный', uz: 'Yalpiz rang', photo: '1759992878772-e83a691a6d8f' },
+      ],
+      sizes: ['S', 'M', 'L', 'XL'],
+    },
+    {
+      id: 'w-blouse', cat: 'women',
+      name: { ru: 'Блуза из сатина', uz: 'Satin bluza' },
+      desc: {
+        ru: 'Лёгкая сатиновая блуза свободного кроя. Подходит и для офиса, и для праздника.',
+        uz: "Erkin bichimli yengil satin bluza. Ofis uchun ham, bayram uchun ham mos.",
+      },
+      price: 289000, oldPrice: 349000,
+      colors: [
+        { hex: '#b3202a', ru: 'Красный', uz: 'Qizil', photo: '1761117228880-df2425bd70da' },
+        { hex: '#f4f1ea', ru: 'Молочный', uz: 'Sut rang', photo: '1611235116156-0cbda6649efb' },
+      ],
+      sizes: ['S', 'M', 'L', 'XL'],
+    },
+    {
+      id: 'w-cardigan', cat: 'women', tags: ['new'],
+      name: { ru: 'Кардиган крупной вязки', uz: "Yirik to'qilgan kardigan" },
+      desc: {
+        ru: 'Тёплый кардиган из шерсти с пуговицами. Объёмный, уютный, на всю осень.',
+        uz: "Tugmali issiq jun kardigan. Hajmli va qulay — butun kuz uchun.",
+      },
+      price: 329000,
+      colors: [
+        { hex: '#c79a3b', ru: 'Горчичный', uz: 'Xantal rang', photo: '1610288311735-39b7facbd095' },
+        { hex: '#a7a39c', ru: 'Серый', uz: 'Kulrang', photo: '1579206464424-7e43a81cadc1' },
+      ],
+      sizes: ['S', 'M', 'L'],
+    },
+    {
+      id: 'w-coat', cat: 'women',
+      name: { ru: 'Пальто с поясом', uz: 'Kamarli palto' },
+      desc: {
+        ru: 'Классическое пальто прямого кроя из шерстяной смеси. Пояс в комплекте.',
+        uz: "Jun aralashmasidan to'g'ri bichimli klassik palto. Kamar to'plamda.",
+      },
+      price: 1290000, oldPrice: 1490000,
+      colors: [
+        { hex: '#a8774a', ru: 'Кэмел', uz: 'Kemel', photo: '1539533018447-63fcce2678e3' },
+        { hex: '#cdb894', ru: 'Бежевый', uz: 'Bej', photo: '1633821879282-0c4e91f96232' },
+      ],
+      photos: ['1539533113208-f6df8cc8b543'],
+      sizes: ['S', 'M', 'L', 'XL'],
+    },
+
+    // ---------- мужчинам ----------
+    {
+      id: 'm-shirt', cat: 'men',
+      name: { ru: 'Рубашка классическая', uz: "Klassik ko'ylak" },
+      desc: {
+        ru: 'Хлопковая рубашка приталенного кроя. Не мнётся, легко гладится.',
+        uz: "Belga mos bichimli paxta ko'ylak. G'ijimlanmaydi, oson dazmollanadi.",
+      },
+      price: 279000,
+      colors: [
+        { hex: '#3f5875', ru: 'Синий', uz: "Ko'k", photo: '1740711152088-88a009e877bb' },
+      ],
+      photos: ['1624835567150-0c530a20d8cc'],
+      sizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    },
+    {
+      id: 'm-shirt-check', cat: 'men',
+      name: { ru: 'Рубашка в клетку', uz: "Katakli ko'ylak" },
+      desc: {
+        ru: 'Плотная фланелевая рубашка в клетку. Можно носить как лёгкую куртку.',
+        uz: "Zich flanel katakli ko'ylak. Yengil kurtka sifatida ham kiysa bo'ladi.",
+      },
+      price: 299000, oldPrice: 359000,
+      colors: [
+        { hex: '#3a3a3a', ru: 'Серая клетка', uz: 'Kulrang katak', photo: '1611312449412-6cefac5dc3e4' },
+      ],
+      sizes: ['M', 'L', 'XL', 'XXL'],
+    },
+    {
+      id: 'm-tee', cat: 'men',
       name: { ru: 'Базовая футболка', uz: 'Bazaviy futbolka' },
       desc: {
-        ru: 'Плотный хлопок 220 г/м², свободный крой и спущенное плечо. Базовая вещь на каждый день.',
-        uz: 'Zich paxta 220 g/m², erkin bichim va tushirilgan yelka. Har kunlik bazaviy kiyim.',
+        ru: 'Плотный хлопок 220 г/м², свободный крой. Базовая вещь на каждый день.',
+        uz: 'Zich paxta 220 g/m², erkin bichim. Har kunlik bazaviy kiyim.',
       },
       price: 149000,
       colors: [
@@ -39,20 +124,7 @@ window.STORE = {
       sizes: ['S', 'M', 'L', 'XL'],
     },
     {
-      id: 'tee-print', cat: 'tshirt',
-      name: { ru: 'Футболка с графичным принтом', uz: 'Grafik printli futbolka' },
-      desc: {
-        ru: 'Хлопок 100%, принт методом шелкографии — не трескается после стирки.',
-        uz: "100% paxta, shelkografiya usulidagi print — yuvilgandan keyin yorilmaydi.",
-      },
-      price: 159000, oldPrice: 199000,
-      colors: [
-        { hex: '#232325', ru: 'Чёрный', uz: 'Qora', photo: '1600805625047-a65db4b4e8d0' },
-      ],
-      sizes: ['S', 'M', 'L', 'XL'],
-    },
-    {
-      id: 'hoodie-fleece', cat: 'hoodie', tags: ['new'],
+      id: 'm-hoodie', cat: 'men', tags: ['new'],
       name: { ru: 'Худи на флисе', uz: 'Flisli xudi' },
       desc: {
         ru: 'Тёплое худи на флисе с капюшоном и карманом-кенгуру.',
@@ -67,20 +139,21 @@ window.STORE = {
       sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     },
     {
-      id: 'zip-jacket', cat: 'hoodie',
-      name: { ru: 'Кофта на молнии', uz: 'Zamokli kofta' },
+      id: 'm-jeans', cat: 'men',
+      name: { ru: 'Джинсы straight', uz: 'Straight jinsi' },
       desc: {
-        ru: 'Лёгкая кофта на молнии с воротником-стойкой. Идеальна для прохладных вечеров.',
-        uz: 'Tik yoqali, zamokli yengil kofta. Salqin kechalar uchun ideal.',
+        ru: 'Прямой крой, средняя посадка, 100% хлопок.',
+        uz: "To'g'ri bichim, o'rta bel, 100% paxta.",
       },
-      price: 429000, oldPrice: 499000,
+      price: 349000,
       colors: [
-        { hex: '#2b3a55', ru: 'Тёмно-синий', uz: "To'q ko'k", photo: '1624548140129-74786c5f1279' },
+        { hex: '#9db5d0', ru: 'Голубой', uz: 'Havorang', photo: '1602293589930-45aad59ba3ab' },
       ],
-      sizes: ['M', 'L', 'XL'],
+      photos: ['1714729382668-7bc3bb261662'],
+      sizes: ['30', '32', '34', '36'],
     },
     {
-      id: 'bomber', cat: 'jacket',
+      id: 'm-bomber', cat: 'men',
       name: { ru: 'Куртка-бомбер', uz: 'Bomber kurtka' },
       desc: {
         ru: 'Лёгкий бомбер с трикотажными манжетами. Водоотталкивающая ткань.',
@@ -93,129 +166,87 @@ window.STORE = {
       photos: ['1774413768759-d3cc719c1a0e'],
       sizes: ['S', 'M', 'L', 'XL'],
     },
+
+    // ---------- детям ----------
     {
-      id: 'denim-jacket', cat: 'jacket', tags: ['new'],
-      name: { ru: 'Джинсовая куртка', uz: 'Jinsi kurtka' },
+      id: 'k-shirt', cat: 'kids', tags: ['new'],
+      name: { ru: 'Детская рубашка в клетку', uz: "Bolalar katakli ko'ylagi" },
       desc: {
-        ru: 'Классическая джинсовая куртка из плотного денима.',
-        uz: 'Zich jinsi matodan klassik jinsi kurtka.',
+        ru: 'Мягкая фланель, не колется. Удобные пуговицы, которые ребёнок застегнёт сам.',
+        uz: "Yumshoq flanel, sanchmaydi. Bola o'zi taqa oladigan qulay tugmalar.",
       },
-      price: 590000,
+      price: 189000,
       colors: [
-        { hex: '#2f4766', ru: 'Тёмный деним', uz: "To'q jinsi", photo: '1611312449408-fcece27cdbb7' },
-        { hex: '#8fa9c6', ru: 'Светлый деним', uz: 'Och jinsi', photo: '1543076447-215ad9ba6923' },
+        { hex: '#b3262f', ru: 'Красная клетка', uz: 'Qizil katak', photo: '1615863712239-becde744591a' },
       ],
-      photos: ['1527016021513-b09758b777bd'],
-      sizes: ['S', 'M', 'L', 'XL'],
+      sizes: ['98', '110', '122', '134'],
     },
     {
-      id: 'jeans-straight', cat: 'jeans',
-      name: { ru: 'Джинсы straight', uz: 'Straight jinsi' },
+      id: 'k-knit', cat: 'kids',
+      name: { ru: 'Свитер с узором', uz: 'Naqshli sviter' },
       desc: {
-        ru: 'Прямой крой, средняя посадка, 100% хлопок.',
-        uz: "To'g'ri bichim, o'rta bel, 100% paxta.",
+        ru: 'Тёплый вязаный свитер с зимним узором. Гипоаллергенная пряжа.',
+        uz: "Qishki naqshli issiq to'qilgan sviter. Gipoallergen ip.",
       },
-      price: 349000,
+      price: 219000,
       colors: [
-        { hex: '#9db5d0', ru: 'Голубой', uz: 'Havorang', photo: '1602293589930-45aad59ba3ab' },
+        { hex: '#c0383c', ru: 'Красный', uz: 'Qizil', photo: '1624272949900-9ae4c56397e8' },
       ],
-      photos: ['1714729382668-7bc3bb261662'],
-      sizes: ['28', '30', '32', '34', '36'],
+      sizes: ['98', '110', '122', '134'],
     },
     {
-      id: 'jeans-wide', cat: 'jeans',
-      name: { ru: 'Джинсы wide leg', uz: 'Wide leg jinsi' },
+      id: 'k-dress', cat: 'kids',
+      name: { ru: 'Нарядное платье для девочки', uz: "Qizlar uchun bayramona ko'ylak" },
       desc: {
-        ru: 'Широкие джинсы с высокой посадкой — тренд сезона.',
-        uz: 'Baland belli keng jinsi — mavsum trendi.',
+        ru: 'Нарядное платье с пышной юбкой — для праздников и семейных торжеств.',
+        uz: "Keng yubkali ko'ylak — bayramlar va oilaviy tantanalar uchun.",
       },
-      price: 379000, oldPrice: 449000,
+      price: 249000, oldPrice: 299000,
       colors: [
-        { hex: '#6f8fb3', ru: 'Синий', uz: "Ko'k", photo: '1598554747436-c9293d6a588f' },
+        { hex: '#c8182b', ru: 'Красный', uz: 'Qizil', photo: '1578897367107-2828e351c8a8' },
       ],
-      sizes: ['26', '28', '30', '32'],
+      sizes: ['98', '110', '122', '134'],
     },
     {
-      id: 'sneakers-urban', cat: 'shoes', tags: ['new'],
-      name: { ru: 'Кроссовки Urban', uz: 'Urban krossovkalari' },
+      id: 'k-jacket', cat: 'kids',
+      name: { ru: 'Детская куртка-пуховик', uz: 'Bolalar puxovik kurtkasi' },
       desc: {
-        ru: 'Лёгкие кроссовки из мягкого текстиля с амортизирующей подошвой.',
-        uz: 'Yumshoq matodan, amortizatsiyali tagcharmli yengil krossovkalar.',
+        ru: 'Лёгкий тёплый пуховик с капюшоном. Держит тепло до −15°.',
+        uz: "Kapyushonli yengil issiq puxovik. −15° gacha issiqni saqlaydi.",
       },
-      price: 599000,
+      price: 459000,
       colors: [
-        { hex: '#c9c4bd', ru: 'Серый', uz: 'Kulrang', photo: '1699092372473-a829f4421580' },
+        { hex: '#2d3a2e', ru: 'Тёмно-зелёный', uz: "To'q yashil", photo: '1759473434572-64c4bfd8cb31' },
+        { hex: '#9a9da1', ru: 'Серый', uz: 'Kulrang', photo: '1529598993581-b025f3f79f9c' },
       ],
-      sizes: ['39', '40', '41', '42', '43', '44'],
+      sizes: ['98', '110', '122', '134'],
     },
     {
-      id: 'sneakers-chunky', cat: 'shoes',
-      name: { ru: 'Кроссовки Chunky', uz: 'Chunky krossovkalari' },
+      id: 'k-denim', cat: 'kids',
+      name: { ru: 'Джинсовый комплект', uz: "Jinsi to'plam" },
       desc: {
-        ru: 'Массивная подошва и яркие вставки. Заметная пара для повседневных образов.',
-        uz: "Massiv tagcharm va yorqin qo'shimchalar. Har kunlik obraz uchun e'tiborli juftlik.",
+        ru: 'Джинсовая куртка и джинсы из мягкого денима со стрейчем.',
+        uz: "Stretchli yumshoq jinsidan kurtka va shim.",
       },
-      price: 690000, oldPrice: 790000,
+      price: 279000,
       colors: [
-        { hex: '#d8cfc4', ru: 'Мультиколор', uz: "Ko'p rangli", photo: '1560769629-975ec94e6a86' },
+        { hex: '#7fa3c9', ru: 'Голубой деним', uz: "Och ko'k jinsi", photo: '1606841466616-795c2c8dec72' },
       ],
-      sizes: ['37', '38', '39', '40', '41', '42'],
-    },
-    {
-      id: 'kedy', cat: 'shoes',
-      name: { ru: 'Кеды Classic', uz: 'Classic kedlar' },
-      desc: {
-        ru: 'Классические кеды из канваса на резиновой подошве.',
-        uz: 'Rezina tagcharmli kanvas klassik kedlar.',
-      },
-      price: 449000, oldPrice: 520000,
-      colors: [
-        { hex: '#28344f', ru: 'Тёмно-синий', uz: "To'q ko'k", photo: '1496202703211-aa28e9500c30' },
-        { hex: '#232325', ru: 'Чёрный', uz: 'Qora', photo: '1641997465126-c73cc4070337' },
-      ],
-      sizes: ['38', '39', '40', '41', '42', '43'],
-    },
-    {
-      id: 'cap', cat: 'acc',
-      name: { ru: 'Кепка Basic', uz: 'Basic kepka' },
-      desc: {
-        ru: 'Хлопковая кепка с регулируемой застёжкой.',
-        uz: 'Sozlanadigan qisqichli paxta kepka.',
-      },
-      price: 99000,
-      colors: [
-        { hex: '#f4f4f2', ru: 'Белый', uz: 'Oq', photo: '1588850561407-ed78c282e89b' },
-        { hex: '#6b6d70', ru: 'Графит', uz: 'Grafit', photo: '1521369909029-2afed882baee' },
-      ],
-      sizes: ['One Size'],
-    },
-    {
-      id: 'shopper', cat: 'acc',
-      name: { ru: 'Сумка-шоппер', uz: 'Shopper sumka' },
-      desc: {
-        ru: 'Вместительный шоппер из плотного хлопка. Влезает ноутбук 14".',
-        uz: "Zich paxtadan sig'imli shopper. 14\" noutbuk sig'adi.",
-      },
-      price: 129000,
-      colors: [
-        { hex: '#c8a77c', ru: 'Крафт', uz: 'Kraft', photo: '1544816155-12df9643f363' },
-        { hex: '#efece6', ru: 'Молочный', uz: 'Sut rang', photo: '1574365569389-a10d488ca3fb' },
-      ],
-      photos: ['1630381260512-e3fe55c11973'],
-      sizes: ['One Size'],
+      sizes: ['98', '110', '122', '134'],
     },
   ],
 };
 
 window.I18N = {
   ru: {
-    tagline: 'онлайн-магазин одежды',
+    tagline: 'семейный магазин одежды',
     search: 'Поиск',
+    allProducts: 'Все товары',
     results: 'Результаты поиска',
     nothingFound: 'Ничего не найдено',
     nothingFoundHint: 'Попробуйте изменить запрос',
-    bannerKicker: 'Осенняя коллекция',
-    bannerTitle: 'Скидки до −20%',
+    bannerKicker: 'Новая коллекция',
+    bannerTitle: 'Одежда для всей семьи',
     bannerCta: 'Смотреть',
     new: 'Новинка',
     home: 'Магазин',
@@ -280,13 +311,14 @@ window.I18N = {
     backToCatalog: 'Вернуться в магазин',
   },
   uz: {
-    tagline: "onlayn kiyim do'koni",
+    tagline: "oilaviy kiyim do'koni",
     search: 'Qidirish',
+    allProducts: 'Barcha mahsulotlar',
     results: 'Qidiruv natijalari',
     nothingFound: 'Hech narsa topilmadi',
     nothingFoundHint: "So'rovni o'zgartirib ko'ring",
-    bannerKicker: 'Kuzgi kolleksiya',
-    bannerTitle: '−20% gacha chegirmalar',
+    bannerKicker: 'Yangi kolleksiya',
+    bannerTitle: 'Butun oila uchun kiyimlar',
     bannerCta: "Ko'rish",
     new: 'Yangi',
     home: "Do'kon",

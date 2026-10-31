@@ -6,6 +6,17 @@
   const tg = window.Telegram && window.Telegram.WebApp;
   const inTG = !!(tg && tg.initData);
 
+  // Вариант дизайна: ?d=classic | night | tg
+  const DESIGNS = {
+    classic: { scheme: 'light', bg: '#fbf6ec', button: '#b8892b', buttonText: '#ffffff' },
+    night: { scheme: 'dark', bg: '#0e0d0b', button: '#d4af37', buttonText: '#17130b' },
+    tg: { scheme: null, bg: null, button: '#c59a2e', buttonText: '#ffffff' },
+  };
+  const design = DESIGNS[new URLSearchParams(location.search).get('d')] ? new URLSearchParams(location.search).get('d') : 'classic';
+  const D = DESIGNS[design];
+  document.documentElement.dataset.design = design;
+  if (window.self !== window.top) document.documentElement.classList.add('embedded');
+
   // ---------- storage ----------
   const ls = {
     get(k, d) {
@@ -73,10 +84,12 @@
 
   // ---------- photos ----------
   // ID фото Unsplash превращается в ссылку нужного размера; полный путь/ссылка используется как есть
-  function photoUrl(src, w, h) {
+  // crop: 'faces' — по лицам (категории с людьми)
+  function photoUrl(src, w, h, crop) {
     if (/[/.]/.test(src)) return src;
     const dpr = Math.min(2, Math.ceil(window.devicePixelRatio || 1));
-    return `https://images.unsplash.com/photo-${src}?w=${w * dpr}&h=${h * dpr}&fit=crop&auto=format&q=70`;
+    const c = crop === 'faces' ? '&crop=faces,center' : '';
+    return `https://images.unsplash.com/photo-${src}?w=${w * dpr}&h=${h * dpr}&fit=crop${c}&auto=format&q=70`;
   }
 
   // Фото выбранного цвета идёт первым, затем общие фото товара
@@ -86,8 +99,8 @@
     return [...new Set(list)];
   }
 
-  const img = (src, w, h, cls = '', alt = '') =>
-    `<img class="${cls}" src="${photoUrl(src, w, h)}" alt="${esc(alt)}" loading="lazy" decoding="async" onload="this.classList.add('ld')">`;
+  const img = (src, w, h, cls = '', alt = '', crop = '') =>
+    `<img class="${cls}" src="${photoUrl(src, w, h, crop)}" alt="${esc(alt)}" loading="lazy" decoding="async" onload="this.classList.add('ld')">`;
 
   // ---------- Telegram ----------
   function haptic(kind) {
@@ -105,16 +118,17 @@
   }
 
   function applyScheme() {
+    if (D.scheme) { document.documentElement.dataset.scheme = D.scheme; return; }
     const dark = inTG ? tg.colorScheme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.dataset.scheme = dark ? 'dark' : 'light';
   }
 
-  // Главная кнопка: в Telegram — нативная MainButton (цвет из темы), в браузере — своя кнопка внизу
+  // Главная кнопка: в Telegram — нативная MainButton в золоте бренда, в браузере — своя кнопка внизу
   let mainHandler = null;
   function setMain(text, fn) {
     mainHandler = fn;
     if (inTG) {
-      tg.MainButton.setParams({ text, is_active: true, is_visible: true });
+      tg.MainButton.setParams({ text, color: D.button, text_color: D.buttonText, is_active: true, is_visible: true });
     } else {
       $fbBtn.textContent = text;
       $fb.hidden = false;
@@ -234,40 +248,91 @@
 
   function listBlock() {
     const list = filtered();
-    const title = state.query.trim() ? t('results') : L(S.categories.find((c) => c.id === state.cat));
+    const title = state.query.trim() ? t('results') : state.cat === 'all' ? t('allProducts') : L(S.categories.find((c) => c.id === state.cat));
     if (!list.length) return empty('🔍', t('nothingFound'), t('nothingFoundHint'), false);
     return `
       <div class="list-head"><span>${title}</span><span>${countLabel(list.length)}</span></div>
       <div class="grid">${list.map(card).join('')}</div>`;
   }
 
+  const langSwitch = () =>
+    `<div class="seg small lang">${['ru', 'uz']
+      .map((l) => `<button class="${state.lang === l ? 'on' : ''}" data-action="lang" data-v="${l}">${l.toUpperCase()}</button>`)
+      .join('')}</div>`;
+
+  const searchBox = () =>
+    `<label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${t('search')}" value="${esc(state.query)}" autocomplete="off"></label>`;
+
+  const banner = (w, h) => `
+    <button class="banner" data-action="cat" data-cat="all">
+      ${img(S.banner, w, h, 'banner-img')}
+      <span class="banner-text">
+        <small>${t('bannerKicker')}</small>
+        <b>${t('bannerTitle')}</b>
+        <span class="banner-cta">${t('bannerCta')}</span>
+      </span>
+    </button>`;
+
+  const catIcon = (c) =>
+    c.photo ? img(c.photo, 120, 120, 'ph', '', 'faces')
+      : c.id === 'sale' ? '<span class="cat-glyph">%</span>'
+        : `<img class="cat-logo" src="${S.logo.icon}" alt="">`;
+
+  // Шапка, категории и баннер отличаются у каждого варианта дизайна
+  function homeTop() {
+    if (design === 'tg') {
+      return `
+        <header class="top">
+          <div class="avatar"><img src="${S.logo.icon}" alt="${S.brand}"></div>
+          <div class="top-text">
+            <div class="top-title">${S.brand}${I.verified}</div>
+            <div class="top-sub">${t('tagline')}</div>
+          </div>
+          ${langSwitch()}
+        </header>
+        ${searchBox()}`;
+    }
+    return `
+      <header class="hero-head">
+        ${langSwitch()}
+        <img class="hero-logo" src="${design === 'night' ? S.logo.mark : S.logo.full}" alt="${S.brand}">
+        ${design === 'night' ? `<div class="hero-tagline">${t('tagline')}</div>` : ''}
+      </header>
+      ${searchBox()}`;
+  }
+
+  function homeCats() {
+    if (design === 'tg') {
+      return `
+        ${banner(560, 260)}
+        <nav class="folders">${S.categories
+          .map((c) => `<button class="folder cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
+          .join('')}</nav>`;
+    }
+    if (design === 'night') {
+      const tiles = S.categories.filter((c) => c.photo);
+      const chips = S.categories.filter((c) => !c.photo);
+      return `
+        ${banner(600, 360)}
+        <div class="tiles">${tiles
+          .map((c) => `<button class="tile cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${img(c.photo, 200, 260, 'ph', '', 'faces')}<span>${L(c)}</span></button>`)
+          .join('')}</div>
+        <div class="chips">${chips
+          .map((c) => `<button class="chip cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
+          .join('')}</div>`;
+    }
+    return `
+      <nav class="circles">${S.categories
+        .map((c) => `<button class="circle cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}"><span class="circle-img">${catIcon(c)}</span><span>${L(c)}</span></button>`)
+        .join('')}</nav>
+      ${banner(560, 320)}`;
+  }
+
   function viewHome() {
     const searching = !!state.query.trim();
     return `
-      <header class="top">
-        <div class="avatar">${S.brand[0]}</div>
-        <div class="top-text">
-          <div class="top-title">${S.brand}${I.verified}</div>
-          <div class="top-sub">${t('tagline')}</div>
-        </div>
-        <div class="seg small">${['ru', 'uz']
-          .map((l) => `<button class="${state.lang === l ? 'on' : ''}" data-action="lang" data-v="${l}">${l.toUpperCase()}</button>`)
-          .join('')}</div>
-      </header>
-      <label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${t('search')}" value="${esc(state.query)}" autocomplete="off"></label>
-      <div id="promo" ${searching ? 'hidden' : ''}>
-        <button class="banner" data-action="cat" data-cat="sale">
-          ${img(S.banner, 560, 260, 'banner-img')}
-          <span class="banner-text">
-            <small>${t('bannerKicker')}</small>
-            <b>${t('bannerTitle')}</b>
-            <span class="banner-cta">${t('bannerCta')}</span>
-          </span>
-        </button>
-        <nav class="folders">${S.categories
-          .map((c) => `<button class="folder ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
-          .join('')}</nav>
-      </div>
+      ${homeTop()}
+      <div id="promo" ${searching ? 'hidden' : ''}>${homeCats()}</div>
       <div id="list">${listBlock()}</div>`;
   }
 
@@ -517,10 +582,10 @@
     state.cat = id;
     haptic('select');
     if (state.view !== 'home') { go('home'); return; }
-    document.querySelectorAll('.folder').forEach((c) => c.classList.toggle('on', c.dataset.cat === id));
+    document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c.dataset.cat === id));
     document.getElementById('list').innerHTML = listBlock();
-    const folder = document.querySelector('.folder.on');
-    if (folder) folder.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const head = document.querySelector('.list-head');
+    if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function selectColor(i) {
@@ -627,8 +692,9 @@
     tg.ready();
     tg.expand();
     try {
-      if (tg.isVersionAtLeast('6.1')) { tg.setHeaderColor('secondary_bg_color'); tg.setBackgroundColor('secondary_bg_color'); }
-      if (tg.isVersionAtLeast('7.10')) tg.setBottomBarColor('secondary_bg_color');
+      const bar = D.bg && tg.isVersionAtLeast('6.9') ? D.bg : 'secondary_bg_color';
+      if (tg.isVersionAtLeast('6.1')) { tg.setHeaderColor(bar); tg.setBackgroundColor(bar); }
+      if (tg.isVersionAtLeast('7.10')) tg.setBottomBarColor(bar);
       if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
     } catch (e) { /* старый клиент */ }
     tg.MainButton.onClick(() => mainHandler && mainHandler());

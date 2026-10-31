@@ -28,6 +28,8 @@
   --danger: var(--tg-theme-destructive-text-color, var(--fb-danger));
   --sep: var(--tg-theme-section-separator-color, var(--fb-sep));
   --ok: #34c759;
+  --accent-bg: var(--accent);
+  --isq-stroke: #fff;
 
   --r: 12px;
   --tabbar-h: 54px;
@@ -94,7 +96,7 @@ body.has-tabbar.has-main #app { padding-bottom: calc(var(--tabbar-h) + 82px + va
 .opt:active, .ci-img:active { opacity: .7; }
 
 .isq { flex: none; width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; background: var(--c); }
-.isq svg { width: 18px; height: 18px; display: block; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.isq svg { width: 18px; height: 18px; display: block; fill: none; stroke: var(--isq-stroke); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .tick { flex: none; color: var(--accent); opacity: 0; transform: scale(.6); transition: opacity .15s, transform .15s; }
 .tick.on { opacity: 1; transform: none; }
@@ -112,7 +114,7 @@ em.ok { color: var(--ok); }
 .seg button { height: 28px; padding: 0 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--hint); transition: background .2s, color .2s; }
 .seg button.on { background: var(--section); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .14); }
 
-.pill { display: inline-block; padding: 2px 7px; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 600; line-height: 16px; }
+.pill { display: inline-block; padding: 2px 7px; border-radius: 6px; background: var(--accent-bg); color: var(--on-accent); font-size: 12px; font-weight: 600; line-height: 16px; }
 .pill.sale { background: var(--danger); color: #fff; }
 
 /* ---------- главная: шапка как у канала ---------- */
@@ -125,7 +127,7 @@ em.ok { color: var(--ok); }
 .top-title { display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 600; letter-spacing: .04em; }
 .verified { width: 17px; height: 17px; flex: none; }
 .verified path:first-child { fill: var(--accent); }
-.verified .vt { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.verified .vt { fill: none; stroke: var(--isq-stroke); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .top-sub { font-size: 14px; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .search { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 10px; border-radius: 10px; background: var(--section); color: var(--hint); }
@@ -135,7 +137,7 @@ em.ok { color: var(--ok); }
 .search input::-webkit-search-cancel-button { filter: grayscale(1); }
 
 .banner { position: relative; display: block; width: 100%; height: 148px; margin-top: 12px; overflow: hidden; border-radius: var(--r); background: #2a2a2a; color: #fff; }
-.banner-img { position: absolute; inset: 0; }
+.banner-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .72) 0%, rgba(0, 0, 0, .35) 60%, rgba(0, 0, 0, .05) 100%); }
 .banner-text { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 0 18px; }
 .banner small { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
@@ -204,7 +206,7 @@ em.ok { color: var(--ok); }
 
 .sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; padding: 12px 16px; }
 .sz { height: 40px; padding: 0 8px; border-radius: 10px; background: var(--fill); font-size: 15px; font-weight: 600; text-align: center; transition: background .15s, color .15s; }
-.sz.on { background: var(--accent); color: var(--on-accent); }
+.sz.on { background: var(--accent-bg); color: var(--on-accent); }
 .shake { animation: shake .4s; }
 
 /* ---------- заголовок страницы ---------- */
@@ -239,7 +241,7 @@ em.ok { color: var(--ok); }
 
 /* ---------- успех / пусто ---------- */
 .success { padding: 40px 12px 0; text-align: center; }
-.done-ic { width: 92px; height: 92px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--on-accent); animation: pop .45s; }
+.done-ic { width: 92px; height: 92px; margin: 0 auto 18px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-bg); color: var(--on-accent); animation: pop .45s; }
 .done-ic svg { width: 46px; height: 46px; stroke-width: 2.6; }
 .success h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; }
 .success p { margin: 4px 0; font-size: 15px; color: var(--hint); }
@@ -249,7 +251,7 @@ em.ok { color: var(--ok); }
 .emoji { margin-bottom: 14px; font-size: 64px; line-height: 1; animation: pop .45s; }
 .empty b { font-size: 18px; font-weight: 600; }
 .empty p { max-width: 260px; margin: 6px 0 0; font-size: 15px; color: var(--hint); }
-.btn { margin-top: 20px; padding: 12px 22px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn { margin-top: 20px; padding: 12px 22px; border-radius: 12px; background: var(--accent-bg); color: var(--on-accent); font-weight: 600; }
 
 /* ---------- таббар ---------- */
 #tabbar {
@@ -277,7 +279,7 @@ body.has-tabbar #tabbar { display: flex; }
 #fallback-main { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; padding: 8px 16px calc(8px + var(--safe-b)); background: var(--page); }
 #fallback-main[hidden] { display: none; }
 body.has-tabbar #fallback-main { bottom: calc(var(--tabbar-h) + var(--safe-b)); padding-bottom: 8px; background: transparent; }
-#fallback-main-btn { display: block; width: 100%; max-width: 528px; height: 50px; margin: 0 auto; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 600; text-align: center; transition: opacity .15s; }
+#fallback-main-btn { display: block; width: 100%; max-width: 528px; height: 50px; margin: 0 auto; border-radius: 12px; background: var(--accent-bg); color: var(--on-accent); font-size: 16px; font-weight: 600; text-align: center; transition: opacity .15s; }
 #fallback-main-btn:active { opacity: .8; }
 
 /* ---------- тост как в Telegram ---------- */
