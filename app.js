@@ -193,9 +193,9 @@
       <h1>${title}</h1>${right}
     </header>`;
 
-  const empty = (emoji, title, hint, cta = true) => `
+  const empty = (icon, title, hint, cta = true) => `
     <div class="empty">
-      <div class="emoji">${emoji}</div>
+      <div class="empty-ic ic">${icon}</div>
       <b>${title}</b>
       ${hint ? `<p>${hint}</p>` : ''}
       ${cta ? `<button class="btn" data-action="tab" data-tab="home">${t('toCatalog')}</button>` : ''}
@@ -249,7 +249,7 @@
   function listBlock() {
     const list = filtered();
     const title = state.query.trim() ? t('results') : state.cat === 'all' ? t('allProducts') : L(S.categories.find((c) => c.id === state.cat));
-    if (!list.length) return empty('🔍', t('nothingFound'), t('nothingFoundHint'), false);
+    if (!list.length) return empty(I.search, t('nothingFound'), t('nothingFoundHint'), false);
     return `
       <div class="list-head"><span>${title}</span><span>${countLabel(list.length)}</span></div>
       <div class="grid">${list.map(card).join('')}</div>`;
@@ -338,7 +338,7 @@
 
   function viewFavs() {
     const list = S.products.filter((p) => state.favs.includes(p.id));
-    return pageHead(t('favs')) + (list.length ? `<div class="grid">${list.map(card).join('')}</div>` : empty('❤️', t('favsEmpty'), t('favsEmptyHint')));
+    return pageHead(t('favs')) + (list.length ? `<div class="grid">${list.map(card).join('')}</div>` : empty(I.heart, t('favsEmpty'), t('favsEmptyHint')));
   }
 
   function viewProduct() {
@@ -400,7 +400,7 @@
   }
 
   function viewCart() {
-    if (!state.cart.length) return pageHead(t('cart')) + empty('🛍️', t('cartEmpty'), t('cartEmptyHint'));
+    if (!state.cart.length) return pageHead(t('cart')) + empty(I.bag, t('cartEmpty'), t('cartEmptyHint'));
     const sum = cartSum();
     const left = S.delivery.freeFrom - sum;
     const hint = left > 0
