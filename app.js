@@ -4,26 +4,23 @@
   const S = window.STORE;
   const I18N = window.I18N;
   const tg = window.Telegram && window.Telegram.WebApp;
-  const inTG = !!(tg && tg.initData);
+  // initData пуст при запуске с reply-кнопки бота, поэтому смотрим и на platform ('unknown' вне Telegram)
+  const inTG = !!(tg && (tg.initData || (tg.platform && tg.platform !== 'unknown')));
+  // BackButton и HapticFeedback появились в Bot API 6.1; на более старых клиентах — свои кнопки «назад»
+  const nativeBack = inTG && tg.isVersionAtLeast('6.1');
 
-  // Вариант дизайна: ?d=classic | night | tg
-  const DESIGNS = {
-    classic: { scheme: 'light', bg: '#fbf6ec', button: '#b8892b', buttonText: '#ffffff' },
-    night: { scheme: 'dark', bg: '#0e0d0b', button: '#d4af37', buttonText: '#17130b' },
-    tg: { scheme: null, bg: null, button: '#c59a2e', buttonText: '#ffffff' },
-  };
-  const design = DESIGNS[new URLSearchParams(location.search).get('d')] ? new URLSearchParams(location.search).get('d') : 'classic';
-  const D = DESIGNS[design];
-  document.documentElement.dataset.design = design;
-  if (window.self !== window.top) document.documentElement.classList.add('embedded');
+  // Цвета бренда для нативных элементов Telegram (шапка, фон, главная кнопка)
+  const BRAND = { bg: '#fbf6ec', button: '#b8892b', buttonText: '#ffffff' };
+  const MAX_QTY = 99;
 
   // ---------- storage ----------
+  // Свой префикс: localStorage общий для всего домена (например, всех сайтов на github.io)
   const ls = {
     get(k, d) {
-      try { const v = localStorage.getItem('shop:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; }
+      try { const v = localStorage.getItem('layan:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; }
     },
     set(k, v) {
-      try { localStorage.setItem('shop:' + k, JSON.stringify(v)); } catch (e) { /* приватный режим */ }
+      try { localStorage.setItem('layan:' + k, JSON.stringify(v)); } catch (e) { /* приватный режим */ }
     },
   };
 
@@ -56,10 +53,13 @@
   // ---------- helpers ----------
   const t = (k) => I18N[state.lang][k] ?? I18N.ru[k] ?? k;
   const L = (o) => (o && typeof o === 'object' ? o[state.lang] ?? o.ru : o);
-  const money = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + L(S.currency);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + L(S.currency);
   const product = (id) => S.products.find((p) => p.id === id);
   const discount = (p) => (p.oldPrice ? Math.round((1 - p.price / p.oldPrice) * 100) : 0);
+
+  // Поиск без учёта регистра, «ё» и разных апострофов узбекской латиницы (o' / oʻ / o‘ / o’)
+  const norm = (s) => String(s).toLowerCase().replace(/ё/g, 'е').replace(/[‘’ʻʼ`´]/g, "'");
 
   function countLabel(n) {
     if (state.lang === 'uz') return n + ' ta mahsulot';
@@ -73,18 +73,46 @@
   const cartSum = () => state.cart.reduce((s, i) => s + product(i.id).price * i.qty, 0);
   const deliveryFee = () => (state.form.method === 'pickup' || cartSum() >= S.delivery.freeFrom ? 0 : S.delivery.fee);
 
-  function fmtPhone(v) {
-    let d = v.replace(/\D/g, '');
-    if (d.startsWith('998')) d = d.slice(3);
-    else if (d.length <= 3 && '998'.startsWith(d)) d = '';
-    d = d.slice(0, 9);
-    const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
-    return '+998 ' + parts.join(' ');
+  // Местные 9 цифр номера (без кода страны 998) из текущего значения поля
+  function localDigits(v) {
+    let d;
+    const m = /^\s*\+(\d*)/.exec(v);
+    if (m) {
+      // цифры, набранные в префиксе сверх 998, — начало местного номера;
+      // если префикс повреждён (стёрли цифру), он просто восстановится
+      d = (m[1].startsWith('998') ? m[1].slice(3) : '') + v.slice(m[0].length).replace(/\D/g, '');
+    } else {
+      d = v.replace(/\D/g, '');
+    }
+    if (d.length > 9 && d.startsWith('998')) d = d.slice(3); // вставили полный номер с кодом страны
+    return d.slice(0, 9);
+  }
+
+  const groupPhone = (d) => '+998 ' + [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean).join(' ');
+
+  // Переформатирует телефон, сохраняя позицию курсора относительно местных цифр
+  function formatPhoneInput(el, inputType, prev) {
+    const raw = el.value;
+    const caret = el.selectionStart ?? raw.length;
+    let d = localDigits(raw);
+    let before = Math.min(localDigits(raw.slice(0, caret)).length, d.length);
+    // Backspace/Delete по пробелу не меняет цифры — тогда удаляем соседнюю цифру
+    if (d === localDigits(prev || '')) {
+      if (inputType === 'deleteContentBackward' && before > 0) { d = d.slice(0, before - 1) + d.slice(before); before--; }
+      else if (inputType === 'deleteContentForward' && before < d.length) d = d.slice(0, before) + d.slice(before + 1);
+    }
+    const out = groupPhone(d);
+    el.value = out;
+    if (document.activeElement !== el) return out;
+    let pos = 5, seen = 0;
+    for (let i = 5; i < out.length && seen < before; i++) if (/\d/.test(out[i]) && ++seen === before) pos = i + 1;
+    el.setSelectionRange(pos, pos);
+    return out;
   }
 
   // ---------- photos ----------
-  // ID фото Unsplash превращается в ссылку нужного размера; полный путь/ссылка используется как есть
-  // crop: 'faces' — по лицам (категории с людьми)
+  // ID фото Unsplash превращается в ссылку нужного размера; полный путь/ссылка используется как есть.
+  // crop: 'faces' — кадрировать по лицам (категории с людьми)
   function photoUrl(src, w, h, crop) {
     if (/[/.]/.test(src)) return src;
     const dpr = Math.min(2, Math.ceil(window.devicePixelRatio || 1));
@@ -95,16 +123,18 @@
   // Фото выбранного цвета идёт первым, затем общие фото товара
   function gallery(p, ci) {
     const main = (p.colors[ci] || p.colors[0]).photo;
-    const list = [main, ...(p.photos || [])].filter(Boolean);
-    return [...new Set(list)];
+    return [...new Set([main, ...(p.photos || [])].filter(Boolean))];
   }
 
-  const img = (src, w, h, cls = '', alt = '', crop = '') =>
-    `<img class="${cls}" src="${photoUrl(src, w, h, crop)}" alt="${esc(alt)}" loading="lazy" decoding="async" onload="this.classList.add('ld')">`;
+  // opts: { crop, eager } — eager для картинок первого экрана (баннер, главное фото товара)
+  function img(src, w, h, cls = '', alt = '', opts = {}) {
+    if (!src) return `<span class="${cls} ld" role="img" aria-label="${esc(alt)}"></span>`;
+    return `<img class="${cls}" src="${photoUrl(src, w, h, opts.crop)}" alt="${esc(alt)}" loading="${opts.eager ? 'eager' : 'lazy'}" decoding="async" onload="this.classList.add('ld')">`;
+  }
 
   // ---------- Telegram ----------
   function haptic(kind) {
-    if (!inTG || !tg.HapticFeedback) return;
+    if (!nativeBack || !tg.HapticFeedback) return;
     try {
       if (kind === 'success' || kind === 'error' || kind === 'warning') tg.HapticFeedback.notificationOccurred(kind);
       else if (kind === 'select') tg.HapticFeedback.selectionChanged();
@@ -117,23 +147,25 @@
     else if (window.confirm(msg)) cb();
   }
 
-  function applyScheme() {
-    if (D.scheme) { document.documentElement.dataset.scheme = D.scheme; return; }
-    const dark = inTG ? tg.colorScheme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.dataset.scheme = dark ? 'dark' : 'light';
-  }
-
-  // Главная кнопка: в Telegram — нативная MainButton в золоте бренда, в браузере — своя кнопка внизу
+  // Главная кнопка: в Telegram — нативная MainButton в золоте бренда, в браузере — своя кнопка внизу.
+  // amount выводится отдельно, чтобы на узком экране обрезалась подпись, а не сумма.
   let mainHandler = null;
-  function setMain(text, fn) {
+  let mainLockUntil = 0; // после смены действия кнопки второй тап двойного нажатия не должен сработать
+  function setMain(label, fn, amount) {
     mainHandler = fn;
     if (inTG) {
-      tg.MainButton.setParams({ text, color: D.button, text_color: D.buttonText, is_active: true, is_visible: true });
+      const text = amount ? `${label} · ${amount}` : label;
+      tg.MainButton.setParams({ text, color: BRAND.button, text_color: BRAND.buttonText, is_active: true, is_visible: true });
     } else {
-      $fbBtn.textContent = text;
+      $fbBtn.innerHTML = `<span class="mb-label">${esc(label)}</span>${amount ? `<span class="mb-amount">·&nbsp;${esc(amount)}</span>` : ''}`;
       $fb.hidden = false;
       document.body.classList.add('has-main');
     }
+  }
+  const lockMain = () => { mainLockUntil = Date.now() + 450; };
+  function pressMain() {
+    if (Date.now() < mainLockUntil || !mainHandler) return;
+    mainHandler();
   }
   function hideMain() {
     mainHandler = null;
@@ -145,14 +177,18 @@
   }
 
   function syncBack() {
-    if (!inTG) return;
+    if (!nativeBack) return;
     if (state.stack.length) tg.BackButton.show();
     else tg.BackButton.hide();
   }
 
   let toastTimer;
+  function hideToast() {
+    clearTimeout(toastTimer);
+    $toast.classList.remove('show');
+  }
   function toast(msg, kind = 'ok') {
-    $toast.innerHTML = `<span class="toast-ic ${kind}">${kind === 'ok' ? I.check : '!'}</span><span>${msg}</span>`;
+    $toast.innerHTML = `<span class="toast-ic ${kind}">${kind === 'ok' ? I.check : '!'}</span><span>${esc(msg)}</span>`;
     $toast.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => $toast.classList.remove('show'), 2000);
@@ -175,11 +211,9 @@
     store: '<svg viewBox="0 0 24 24"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9.5 20v-5h5v5"/></svg>',
     cash: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/></svg>',
     card: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19M6 15h4"/></svg>',
-    verified: '<svg viewBox="0 0 24 24" class="verified"><path d="M12 2l2.4 1.8 3-.2 1 2.8 2.6 1.6-.8 2.9.8 2.9-2.6 1.6-1 2.8-3-.2L12 22l-2.4-1.8-3 .2-1-2.8L3 16l.8-2.9L3 10.2l2.6-1.6 1-2.8 3 .2z"/><path d="M8.5 12.2l2.3 2.3 4.7-4.8" class="vt"/></svg>',
   };
 
-  const isq = (icon, color) => `<span class="isq" style="--c:${color}">${icon}</span>`;
-  const COLORS = { blue: '#007aff', green: '#34c759', orange: '#ff9500', purple: '#af52de', red: '#ff3b30' };
+  const isq = (icon) => `<span class="isq">${icon}</span>`;
 
   // ---------- shared blocks ----------
   const section = (header, body, footer = '', cls = '') => `
@@ -187,9 +221,11 @@
     <div class="sec ${cls}">${body}</div>
     ${footer ? `<div class="sec-f">${footer}</div>` : ''}`;
 
+  const backBtn = (cls) => `<button class="${cls} ic" data-action="back" aria-label="${esc(t('back'))}">${I.back}</button>`;
+
   const pageHead = (title, right = '') => `
     <header class="page-head">
-      ${!inTG && state.stack.length ? `<button class="back ic" data-action="back" aria-label="${t('back')}">${I.back}</button>` : ''}
+      ${!nativeBack && state.stack.length ? backBtn('back') : ''}
       <h1>${title}</h1>${right}
     </header>`;
 
@@ -201,16 +237,19 @@
       ${cta ? `<button class="btn" data-action="tab" data-tab="home">${t('toCatalog')}</button>` : ''}
     </div>`;
 
+  const favBtn = (p, cls = '') =>
+    `<button class="fav ic ${cls} ${state.favs.includes(p.id) ? 'on' : ''}" data-action="fav" data-id="${p.id}" aria-label="${esc(t('favs'))}" aria-pressed="${state.favs.includes(p.id)}">${I.heart}</button>`;
+
   function card(p) {
     const d = discount(p);
-    const fav = state.favs.includes(p.id);
     const badge = d ? `<span class="pill sale">−${d}%</span>` : p.tags && p.tags.includes('new') ? `<span class="pill">${t('new')}</span>` : '';
     return `
-      <article class="card" data-action="open" data-id="${p.id}">
+      <article class="card">
+        <button class="card-open" data-action="open" data-id="${p.id}" aria-label="${esc(L(p.name))}"></button>
         <div class="card-img">
           ${img(gallery(p, 0)[0], 240, 300, 'ph', L(p.name))}
           ${badge}
-          <button class="fav ic ${fav ? 'on' : ''}" data-action="fav" data-id="${p.id}" aria-label="${t('favs')}">${I.heart}</button>
+          ${favBtn(p)}
         </div>
         <div class="card-body">
           <div class="price">${money(p.price)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
@@ -237,9 +276,9 @@
 
   // ---------- views ----------
   function filtered() {
-    const q = state.query.trim().toLowerCase();
+    const q = norm(state.query.trim());
     return S.products.filter((p) => {
-      if (q) return (p.name.ru + ' ' + p.name.uz).toLowerCase().includes(q);
+      if (q) return norm(`${p.name.ru} ${p.name.uz}`).includes(q);
       if (state.cat === 'all') return true;
       if (state.cat === 'sale') return !!p.oldPrice;
       return p.cat === state.cat;
@@ -255,84 +294,34 @@
       <div class="grid">${list.map(card).join('')}</div>`;
   }
 
-  const langSwitch = () =>
-    `<div class="seg small lang">${['ru', 'uz']
-      .map((l) => `<button class="${state.lang === l ? 'on' : ''}" data-action="lang" data-v="${l}">${l.toUpperCase()}</button>`)
-      .join('')}</div>`;
-
-  const searchBox = () =>
-    `<label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${t('search')}" value="${esc(state.query)}" autocomplete="off"></label>`;
-
-  const banner = (w, h) => `
-    <button class="banner" data-action="cat" data-cat="all">
-      ${img(S.banner, w, h, 'banner-img')}
-      <span class="banner-text">
-        <small>${t('bannerKicker')}</small>
-        <b>${t('bannerTitle')}</b>
-        <span class="banner-cta">${t('bannerCta')}</span>
-      </span>
-    </button>`;
-
   const catIcon = (c) =>
-    c.photo ? img(c.photo, 120, 120, 'ph', '', 'faces')
+    c.photo ? img(c.photo, 120, 120, 'ph', '', { crop: 'faces' })
       : c.id === 'sale' ? '<span class="cat-glyph">%</span>'
         : `<img class="cat-logo" src="${S.logo.icon}" alt="">`;
-
-  // Шапка, категории и баннер отличаются у каждого варианта дизайна
-  function homeTop() {
-    if (design === 'tg') {
-      return `
-        <header class="top">
-          <div class="avatar"><img src="${S.logo.icon}" alt="${S.brand}"></div>
-          <div class="top-text">
-            <div class="top-title">${S.brand}${I.verified}</div>
-            <div class="top-sub">${t('tagline')}</div>
-          </div>
-          ${langSwitch()}
-        </header>
-        ${searchBox()}`;
-    }
-    return `
-      <header class="hero-head">
-        ${langSwitch()}
-        <img class="hero-logo" src="${design === 'night' ? S.logo.mark : S.logo.full}" alt="${S.brand}">
-        ${design === 'night' ? `<div class="hero-tagline">${t('tagline')}</div>` : ''}
-      </header>
-      ${searchBox()}`;
-  }
-
-  function homeCats() {
-    if (design === 'tg') {
-      return `
-        ${banner(560, 260)}
-        <nav class="folders">${S.categories
-          .map((c) => `<button class="folder cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
-          .join('')}</nav>`;
-    }
-    if (design === 'night') {
-      const tiles = S.categories.filter((c) => c.photo);
-      const chips = S.categories.filter((c) => !c.photo);
-      return `
-        ${banner(600, 360)}
-        <div class="tiles">${tiles
-          .map((c) => `<button class="tile cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${img(c.photo, 200, 260, 'ph', '', 'faces')}<span>${L(c)}</span></button>`)
-          .join('')}</div>
-        <div class="chips">${chips
-          .map((c) => `<button class="chip cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
-          .join('')}</div>`;
-    }
-    return `
-      <nav class="circles">${S.categories
-        .map((c) => `<button class="circle cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}"><span class="circle-img">${catIcon(c)}</span><span>${L(c)}</span></button>`)
-        .join('')}</nav>
-      ${banner(560, 320)}`;
-  }
 
   function viewHome() {
     const searching = !!state.query.trim();
     return `
-      ${homeTop()}
-      <div id="promo" ${searching ? 'hidden' : ''}>${homeCats()}</div>
+      <header class="hero-head">
+        <div class="seg lang">${['ru', 'uz']
+          .map((l) => `<button class="${state.lang === l ? 'on' : ''}" data-action="lang" data-v="${l}">${l.toUpperCase()}</button>`)
+          .join('')}</div>
+        <img class="hero-logo" src="${S.logo.full}" alt="${esc(`${S.brand} — ${t('tagline')}`)}">
+      </header>
+      <label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${esc(t('search'))}" aria-label="${esc(t('search'))}" value="${esc(state.query)}" autocomplete="off"></label>
+      <div id="promo" ${searching ? 'hidden' : ''}>
+        <nav class="circles">${S.categories
+          .map((c) => `<button class="circle cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}"><span class="circle-img">${catIcon(c)}</span><span>${L(c)}</span></button>`)
+          .join('')}</nav>
+        <button class="banner" data-action="cat" data-cat="all">
+          ${img(S.banner, 560, 320, 'banner-img', '', { eager: true })}
+          <span class="banner-text">
+            <small>${t('bannerKicker')}</small>
+            <b>${t('bannerTitle')}</b>
+            <span class="banner-cta">${t('bannerCta')}</span>
+          </span>
+        </button>
+      </div>
       <div id="list">${listBlock()}</div>`;
   }
 
@@ -346,21 +335,20 @@
     const sel = state.sel;
     const c = p.colors[sel.color];
     const d = discount(p);
-    const fav = state.favs.includes(p.id);
     const photos = gallery(p, sel.color);
 
     const colorOpts = p.colors.map((x, i) => `
-      <button class="color-opt ${i === sel.color ? 'on' : ''}" data-action="color" data-i="${i}">
+      <button class="color-opt ${i === sel.color ? 'on' : ''}" data-action="color" data-i="${i}" aria-pressed="${i === sel.color}">
         <span class="thumb" style="background:${x.hex}">${x.photo ? img(x.photo, 64, 80, 'ph') : ''}</span>
         <span>${L(x)}</span>
       </button>`).join('');
 
     return `
       <div class="gal-wrap">
-        <div class="gal" id="gal">${photos.map((src) => img(src, 560, 700, 'ph', L(p.name))).join('')}</div>
+        <div class="gal" id="gal">${photos.map((src, i) => img(src, 480, 600, 'ph', L(p.name), { eager: i === 0 })).join('')}</div>
         ${photos.length > 1 ? `<div class="gal-dots" id="gal-dots">${photos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}
-        ${!inTG ? `<button class="float-btn back ic" data-action="back" aria-label="${t('back')}">${I.back}</button>` : ''}
-        <button class="float-btn fav ic ${fav ? 'on' : ''}" data-action="fav" data-id="${p.id}" aria-label="${t('favs')}">${I.heart}</button>
+        ${!nativeBack ? backBtn('float-btn back') : ''}
+        ${favBtn(p, 'float-btn')}
       </div>
 
       <div class="sec pd-info">
@@ -371,12 +359,12 @@
 
       ${section(`${t('color')}: <b>${L(c)}</b>`, `<div class="colors">${colorOpts}</div>`)}
       ${section(`${t('size')}${sel.size ? `: <b>${sel.size}</b>` : ''}`,
-        `<div class="sizes" id="sizes">${p.sizes.map((s) => `<button class="sz ${s === sel.size ? 'on' : ''}" data-action="size" data-s="${s}">${s}</button>`).join('')}</div>`)}
+        `<div class="sizes" id="sizes">${p.sizes.map((s) => `<button class="sz ${s === sel.size ? 'on' : ''}" data-action="size" data-s="${esc(s)}" aria-pressed="${s === sel.size}">${s}</button>`).join('')}</div>`)}
       ${section(t('description'), `<p class="pd-desc">${L(p.desc)}</p>`)}
       ${section('', `
-        <div class="cell">${isq(I.truck, COLORS.blue)}<div class="cell-main"><div class="cell-title">${t('perkDelivery')}</div><div class="cell-sub">${t('perkDeliverySub')}</div></div></div>
-        <div class="cell">${isq(I.shirt, COLORS.purple)}<div class="cell-main"><div class="cell-title">${t('perkFitting')}</div><div class="cell-sub">${t('perkFittingSub')}</div></div></div>
-        <div class="cell">${isq(I.swap, COLORS.orange)}<div class="cell-main"><div class="cell-title">${t('perkReturn')}</div><div class="cell-sub">${t('perkReturnSub')}</div></div></div>`,
+        <div class="cell">${isq(I.truck)}<div class="cell-main"><div class="cell-title">${t('perkDelivery')}</div><div class="cell-sub">${t('perkDeliverySub')}</div></div></div>
+        <div class="cell">${isq(I.shirt)}<div class="cell-main"><div class="cell-title">${t('perkFitting')}</div><div class="cell-sub">${t('perkFittingSub')}</div></div></div>
+        <div class="cell">${isq(I.swap)}<div class="cell-main"><div class="cell-title">${t('perkReturn')}</div><div class="cell-sub">${t('perkReturnSub')}</div></div></div>`,
         '', 'icons gap-top')}`;
   }
 
@@ -385,16 +373,18 @@
     const c = p.colors[it.color];
     return `
       <div class="cell ci">
-        <span class="ci-img" data-action="open" data-id="${p.id}">${img(gallery(p, it.color)[0], 56, 70, 'ph', L(p.name))}</span>
+        <button class="ci-img" data-action="open" data-id="${p.id}" data-color="${it.color}" data-size="${esc(it.size)}" aria-label="${esc(L(p.name))}">${img(gallery(p, it.color)[0], 56, 70, 'ph', L(p.name))}</button>
         <div class="cell-main">
           <div class="ci-name">${L(p.name)}</div>
           <div class="cell-sub">${L(c)} · ${it.size}</div>
-          <div class="ci-price">${money(p.price * it.qty)}</div>
-        </div>
-        <div class="stepper">
-          <button class="ic ${it.qty === 1 ? 'del' : ''}" data-action="dec" data-idx="${idx}" aria-label="−">${it.qty === 1 ? I.trash : I.minus}</button>
-          <span>${it.qty}</span>
-          <button class="ic" data-action="inc" data-idx="${idx}" aria-label="+">${I.plus}</button>
+          <div class="ci-row">
+            <span class="ci-price">${money(p.price * it.qty)}</span>
+            <span class="stepper">
+              <button class="ic ${it.qty === 1 ? 'del' : ''}" data-action="dec" data-idx="${idx}" aria-label="−">${it.qty === 1 ? I.trash : I.minus}</button>
+              <span>${it.qty}</span>
+              <button class="ic" data-action="inc" data-idx="${idx}" aria-label="+" ${it.qty >= MAX_QTY ? 'disabled' : ''}>${I.plus}</button>
+            </span>
+          </div>
         </div>
       </div>`;
   }
@@ -414,14 +404,14 @@
 
   function viewCheckout() {
     const f = state.form, e = state.errors;
-    const input = (key, label, attrs) => `
+    const input = (key, label, ph, attrs = '') => `
       <label class="cell field ${e[key] ? 'err' : ''}">
         ${label ? `<span class="field-label">${label}</span>` : ''}
-        <input data-field="${key}" value="${esc(f[key])}" ${attrs}>
+        <input data-field="${key}" value="${esc(f[key])}" placeholder="${esc(ph)}" aria-label="${esc(label || ph)}" aria-invalid="${!!e[key]}" ${attrs}>
       </label>`;
-    const option = (action, value, current, icon, color, title, sub) => `
-      <button class="cell opt" data-action="${action}" data-v="${value}">
-        ${isq(icon, color)}
+    const option = (action, value, current, icon, title, sub) => `
+      <button class="cell opt" data-action="${action}" data-v="${value}" aria-pressed="${value === current}">
+        ${isq(icon)}
         <span class="cell-main"><span class="cell-title">${title}</span><span class="cell-sub">${sub}</span></span>
         <span class="tick ic ${value === current ? 'on' : ''}">${I.check}</span>
       </button>`;
@@ -430,22 +420,22 @@
     return `
       ${pageHead(t('checkoutTitle'))}
       ${section(t('contacts'),
-        input('name', t('name'), `placeholder="${t('namePh')}" autocomplete="name"`) +
-        input('phone', t('phone'), 'type="tel" inputmode="tel" placeholder="+998 90 123 45 67" autocomplete="tel"'))}
+        input('name', t('name'), t('namePh'), 'autocomplete="name" maxlength="60"') +
+        input('phone', t('phone'), '+998 90 123 45 67', 'type="tel" inputmode="tel" autocomplete="tel"'))}
 
       ${section(t('receive'),
-        option('method', 'delivery', f.method, I.truck, COLORS.blue, `${t('delivery')} · ${fee}`, t('deliverySub')) +
-        option('method', 'pickup', f.method, I.store, COLORS.orange, `${t('pickup')} · ${t('free')}`, `${t('pickupPoint')}, ${t('pickupHours')}`),
+        option('method', 'delivery', f.method, I.truck, `${t('delivery')} · ${fee}`, t('deliverySub')) +
+        option('method', 'pickup', f.method, I.store, `${t('pickup')} · ${t('free')}`, `${t('pickupPoint')}, ${t('pickupHours')}`),
         '', 'icons')}
 
-      ${f.method === 'delivery' ? section(t('address'), input('address', '', `placeholder="${t('addressPh')}" autocomplete="street-address"`)) : ''}
+      ${f.method === 'delivery' ? section(t('address'), input('address', '', t('addressPh'), 'autocomplete="street-address" maxlength="200"')) : ''}
 
       ${section(t('payment'),
-        option('pay', 'cash', f.pay, I.cash, COLORS.green, t('pay_cash'), t('pay_cashSub')) +
-        option('pay', 'card', f.pay, I.card, COLORS.purple, t('pay_card'), t('pay_cardSub')),
+        option('pay', 'cash', f.pay, I.cash, t('pay_cash'), t('pay_cashSub')) +
+        option('pay', 'card', f.pay, I.card, t('pay_card'), t('pay_cardSub')),
         t('payHint'), 'icons')}
 
-      ${section(t('comment'), `<label class="cell field"><textarea data-field="comment" rows="2" placeholder="${t('commentPh')}">${esc(f.comment)}</textarea></label>`)}
+      ${section(t('comment'), `<label class="cell field"><textarea data-field="comment" rows="2" maxlength="500" placeholder="${esc(t('commentPh'))}" aria-label="${esc(t('comment'))}">${esc(f.comment)}</textarea></label>`)}
 
       ${section(t('yourOrder'), summary(), t('demoNote'))}`;
   }
@@ -472,7 +462,7 @@
     if (!show) { $tabbar.innerHTML = ''; return; }
     const n = cartCount();
     const tab = (id, icon, label, badge) =>
-      `<button class="tab ic ${state.view === id ? 'on' : ''}" data-action="tab" data-tab="${id}">${icon}${badge ? `<em>${badge}</em>` : ''}<span>${label}</span></button>`;
+      `<button class="tab ic ${state.view === id ? 'on' : ''}" data-action="tab" data-tab="${id}" ${state.view === id ? 'aria-current="page"' : ''}>${icon}${badge ? `<em>${badge > MAX_QTY ? MAX_QTY + '+' : badge}</em>` : ''}<span>${label}</span></button>`;
     $tabbar.innerHTML = tab('home', I.shop, t('home')) + tab('favs', I.heart, t('favs')) + tab('cart', I.bag, t('cart'), n);
   }
 
@@ -482,11 +472,11 @@
       const p = product(state.params.id);
       const inCart = state.cart.some((i) => i.id === p.id && i.color === state.sel.color && i.size === state.sel.size);
       if (inCart) setMain(t('goToCart'), () => go('cart'));
-      else setMain(`${t('addToCart')} · ${money(p.price)}`, addToCart);
+      else setMain(t('addToCart'), addToCart, money(p.price));
     } else if (v === 'cart' && state.cart.length) {
-      setMain(`${t('checkout')} · ${money(cartSum() + deliveryFee())}`, () => go('checkout'));
+      setMain(t('checkout'), () => go('checkout'), money(cartSum() + deliveryFee()));
     } else if (v === 'checkout') {
-      setMain(`${t('confirm')} · ${money(cartSum() + deliveryFee())}`, submitOrder);
+      setMain(t('confirm'), submitOrder, money(cartSum() + deliveryFee()));
     } else if (v === 'success') {
       setMain(t('backToCatalog'), () => go('home'));
     } else {
@@ -506,6 +496,11 @@
 
   function render() {
     document.documentElement.lang = state.lang;
+    if ($app.dataset.view !== state.view) {
+      hideToast(); // уведомление не переносим на другой экран
+      lockMain(); // кнопка в том же месте сменила действие — защищаемся от двойного тапа
+    }
+    $app.dataset.view = state.view;
     $app.innerHTML = VIEWS[state.view]();
     if (state.view === 'product') bindGallery();
     renderTabbar();
@@ -519,12 +514,40 @@
     $app.classList.add('enter');
   }
 
+  // ---------- история браузера (только вне Telegram) ----------
+  // Каждому экрану в стеке соответствует запись history, чтобы системная кнопка «Назад»
+  // возвращала на предыдущий экран. При сбросе стека (вкладки, успешный заказ) лишние записи сматываются.
+  let unwinding = false;   // ждём popstate от history.go(-n)
+  let pendingPushes = 0;   // переходы, сделанные пока история сматывалась
+  let backPending = false; // history.back() уже вызван, второй тап игнорируем
+
+  function histPush() {
+    if (inTG) return;
+    if (unwinding) pendingPushes++;
+    else history.pushState({ layan: true }, '');
+  }
+  function histUnwind(n) {
+    if (inTG || n <= 0) return;
+    if (unwinding) { pendingPushes = Math.max(0, pendingPushes - n); return; }
+    unwinding = true;
+    history.go(-n);
+  }
+
   function go(view, params = {}) {
-    if (TABS.includes(view) || view === 'success') state.stack = [];
-    else state.stack.push({ view: state.view, params: state.params, y: window.scrollY });
+    if (view === 'product' && !product(params.id)) return;
+    if (TABS.includes(view) || view === 'success') {
+      histUnwind(state.stack.length);
+      state.stack = [];
+    } else {
+      state.stack.push({ view: state.view, params: state.params, y: window.scrollY });
+      histPush();
+    }
     if (view === 'product') {
       const p = product(params.id);
-      state.sel = { color: 0, size: p.sizes.length === 1 ? p.sizes[0] : null };
+      // из корзины товар открывается с тем же цветом и размером, что в корзине
+      const color = p.colors[params.color] ? params.color : 0;
+      const size = p.sizes.includes(params.size) ? params.size : p.sizes.length === 1 ? p.sizes[0] : null;
+      state.sel = { color, size };
     }
     if (view === 'checkout') state.errors = {};
     state.view = view;
@@ -544,6 +567,25 @@
     window.scrollTo(0, prev.y || 0);
   }
 
+  // Кнопка «назад» в интерфейсе: в браузере идём через историю, чтобы она не расходилась со стеком экранов
+  function navBack() {
+    if (inTG || !state.stack.length) { back(); return; }
+    if (backPending || unwinding) return;
+    backPending = true;
+    history.back();
+  }
+
+  function onPopState() {
+    if (inTG) return;
+    if (unwinding) {
+      unwinding = false;
+      for (; pendingPushes > 0; pendingPushes--) history.pushState({ layan: true }, '');
+      return;
+    }
+    backPending = false;
+    back();
+  }
+
   // ---------- actions ----------
   function addToCart() {
     const p = product(state.params.id);
@@ -559,12 +601,13 @@
       return;
     }
     const ex = state.cart.find((i) => i.id === p.id && i.color === sel.color && i.size === sel.size);
-    if (ex) ex.qty++;
+    if (ex) ex.qty = Math.min(MAX_QTY, ex.qty + 1);
     else state.cart.push({ id: p.id, color: sel.color, size: sel.size, qty: 1 });
     saveCart();
     haptic('success');
     toast(t('added'));
     syncMain();
+    lockMain(); // кнопка стала «Перейти в корзину»
   }
 
   function toggleFav(id) {
@@ -574,7 +617,10 @@
     ls.set('favs', state.favs);
     haptic('light');
     if (state.view === 'favs') { render(); return; }
-    document.querySelectorAll(`.fav[data-id="${id}"]`).forEach((b) => b.classList.toggle('on', i < 0));
+    document.querySelectorAll(`.fav[data-id="${id}"]`).forEach((b) => {
+      b.classList.toggle('on', i < 0);
+      b.setAttribute('aria-pressed', String(i < 0));
+    });
   }
 
   function setCat(id) {
@@ -594,8 +640,6 @@
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
-    const gal = document.getElementById('gal');
-    if (gal) gal.scrollLeft = 0;
   }
 
   function submitOrder() {
@@ -617,7 +661,8 @@
       sum: cartSum(), fee: deliveryFee(), count: cartCount(),
       method: f.method, pay: f.pay,
     };
-    ls.set('form', { name: f.name, phone: f.phone, address: f.address });
+    ls.set('form', { name: f.name.trim(), phone: f.phone, address: f.address.trim() });
+    state.form.comment = ''; // комментарий относится только к этому заказу
     state.cart = [];
     saveCart();
     haptic('success');
@@ -625,24 +670,38 @@
   }
 
   // ---------- events ----------
+  // После удаления строки корзины под пальцем оказывается кнопка следующей — гасим второй тап двойного нажатия
+  let cartTapLockUntil = 0;
+
   document.addEventListener('click', (ev) => {
     const el = ev.target.closest('[data-action]');
-    if (!el) return;
+    if (!el || el.disabled) return;
     const d = el.dataset;
+    if ((d.action === 'inc' || d.action === 'dec') && Date.now() < cartTapLockUntil) return;
     switch (d.action) {
-      case 'open': haptic('light'); go('product', { id: d.id }); break;
+      case 'open':
+        haptic('light');
+        go('product', { id: d.id, color: d.color != null ? +d.color : undefined, size: d.size });
+        break;
       case 'fav': toggleFav(d.id); break;
       case 'cat': setCat(d.cat); break;
       case 'tab': if (state.view !== d.tab) { haptic('select'); go(d.tab); } break;
-      case 'back': back(); break;
+      case 'back': navBack(); break;
       case 'lang': state.lang = d.v; ls.set('lang', d.v); haptic('select'); render(); break;
       case 'color': selectColor(+d.i); break;
       case 'size': state.sel.size = d.s; haptic('select'); render(); break;
-      case 'inc': state.cart[+d.idx].qty++; saveCart(); haptic('light'); render(); break;
+      case 'inc': {
+        const it = state.cart[+d.idx];
+        if (!it) break;
+        it.qty = Math.min(MAX_QTY, it.qty + 1);
+        saveCart(); haptic('light'); render();
+        break;
+      }
       case 'dec': {
         const it = state.cart[+d.idx];
+        if (!it) break;
         if (it.qty > 1) it.qty--;
-        else state.cart.splice(+d.idx, 1);
+        else { state.cart.splice(+d.idx, 1); cartTapLockUntil = Date.now() + 400; }
         saveCart(); haptic('light'); render();
         break;
       }
@@ -650,6 +709,10 @@
       case 'method': state.form.method = d.v; haptic('select'); render(); break;
       case 'pay': state.form.pay = d.v; haptic('select'); render(); break;
     }
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') ev.target.blur();
   });
 
   document.addEventListener('input', (ev) => {
@@ -662,11 +725,11 @@
     }
     const key = el.dataset.field;
     if (!key) return;
-    if (key === 'phone') el.value = fmtPhone(el.value);
-    state.form[key] = el.value;
+    state.form[key] = key === 'phone' ? formatPhoneInput(el, ev.inputType, state.form.phone) : el.value;
     if (state.errors[key]) {
       delete state.errors[key];
       el.closest('.field').classList.remove('err');
+      el.setAttribute('aria-invalid', 'false');
     }
   });
 
@@ -675,34 +738,32 @@
     if (el.dataset && el.dataset.field === 'phone' && !el.value) el.value = state.form.phone = '+998 ';
   });
 
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') ev.target.blur();
-  });
+  window.addEventListener('popstate', onPopState);
 
   // ---------- init ----------
-  state.cart = state.cart.filter((i) => product(i.id) && product(i.id).colors[i.color]);
+  // Данные из localStorage могли остаться от старой версии каталога — оставляем только валидное
+  state.cart = (Array.isArray(state.cart) ? state.cart : []).filter((i) => {
+    const p = i && product(i.id);
+    return p && p.colors[i.color] && p.sizes.includes(i.size) && Number.isInteger(i.qty) && i.qty > 0;
+  }).map((i) => ({ ...i, qty: Math.min(MAX_QTY, i.qty) }));
+  state.favs = (Array.isArray(state.favs) ? state.favs : []).filter((id) => product(id));
+  if (!I18N[state.lang]) state.lang = 'ru';
   const saved = ls.get('form', {});
-  Object.keys(saved).forEach((k) => { if (saved[k]) state.form[k] = saved[k]; });
+  ['name', 'phone', 'address'].forEach((k) => { if (saved && typeof saved[k] === 'string' && saved[k]) state.form[k] = saved[k]; });
 
-  applyScheme();
-  $fbBtn.addEventListener('click', () => mainHandler && mainHandler());
+  $fbBtn.addEventListener('click', pressMain);
 
   if (inTG) {
-    document.documentElement.dataset.tg = '1';
     tg.ready();
     tg.expand();
     try {
-      const bar = D.bg && tg.isVersionAtLeast('6.9') ? D.bg : 'secondary_bg_color';
-      if (tg.isVersionAtLeast('6.1')) { tg.setHeaderColor(bar); tg.setBackgroundColor(bar); }
-      if (tg.isVersionAtLeast('7.10')) tg.setBottomBarColor(bar);
+      if (tg.isVersionAtLeast('6.1')) tg.setBackgroundColor(BRAND.bg);
+      if (tg.isVersionAtLeast('6.9')) tg.setHeaderColor(BRAND.bg); // hex в шапке — только с 6.9
+      if (tg.isVersionAtLeast('7.10')) tg.setBottomBarColor(BRAND.bg);
       if (tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes();
     } catch (e) { /* старый клиент */ }
-    tg.MainButton.onClick(() => mainHandler && mainHandler());
-    tg.BackButton.onClick(back);
-    tg.onEvent('themeChanged', applyScheme);
-  } else if (window.matchMedia) {
-    const mq = matchMedia('(prefers-color-scheme: dark)');
-    if (mq.addEventListener) mq.addEventListener('change', applyScheme);
+    tg.MainButton.onClick(pressMain);
+    if (nativeBack) tg.BackButton.onClick(back);
   }
 
   render();

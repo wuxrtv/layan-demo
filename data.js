@@ -7,7 +7,7 @@
 
 window.STORE = {
   brand: 'LAYAN',
-  logo: { full: 'assets/logo-full.webp', mark: 'assets/logo-mark.webp', icon: 'assets/logo-icon.webp' },
+  logo: { full: 'assets/logo-full.webp', icon: 'assets/logo-icon.webp' },
   currency: { ru: 'сум', uz: "so'm" },
   delivery: { fee: 25000, freeFrom: 500000 },
   banner: '1756982477754-2c05a288f4db',
