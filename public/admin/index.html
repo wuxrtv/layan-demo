@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>LAYAN — админ-панель</title>
+  <link rel="icon" href="../assets/logo-icon.webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="adm-top">
+    <div class="adm-brand">
+      <img src="../assets/logo-icon.webp" alt="">
+      <div><b>LAYAN</b><small id="me">админ-панель</small></div>
+    </div>
+    <a class="link" href="/cdn-cgi/access/logout">Выйти</a>
+  </header>
+  <nav class="adm-nav" id="nav"></nav>
+  <main id="app"></main>
+  <input type="file" id="file" accept="image/*" hidden>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="admin.js"></script>
+</body>
+</html>

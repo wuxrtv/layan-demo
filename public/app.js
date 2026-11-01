@@ -52,7 +52,9 @@
 
   // ---------- helpers ----------
   const t = (k) => I18N[state.lang][k] ?? I18N.ru[k] ?? k;
-  const L = (o) => (o && typeof o === 'object' ? o[state.lang] ?? o.ru : o);
+  const L = (o) => (o && typeof o === 'object' ? o[state.lang] || o.ru || '' : o);
+  // Тексты товаров приходят из админки — всегда экранируем при выводе
+  const E = (o) => esc(L(o) ?? '');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + L(S.currency);
   const product = (id) => S.products.find((p) => p.id === id);
@@ -71,7 +73,7 @@
   const saveCart = () => ls.set('cart', state.cart);
   const cartCount = () => state.cart.reduce((s, i) => s + i.qty, 0);
   const cartSum = () => state.cart.reduce((s, i) => s + product(i.id).price * i.qty, 0);
-  const deliveryFee = () => (state.form.method === 'pickup' || cartSum() >= S.delivery.freeFrom ? 0 : S.delivery.fee);
+  const deliveryFee = () => (state.form.method === 'pickup' || cartSum() >= S.settings.freeFrom ? 0 : S.settings.deliveryFee);
 
   // Местные 9 цифр номера (без кода страны 998) из текущего значения поля
   function localDigits(v) {
@@ -253,7 +255,7 @@
         </div>
         <div class="card-body">
           <div class="price">${money(p.price)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
-          <div class="name">${L(p.name)}</div>
+          <div class="name">${E(p.name)}</div>
           ${p.colors.length > 1 ? `<div class="dots">${p.colors.map((c) => `<i style="background:${c.hex}"></i>`).join('')}</div>` : ''}
         </div>
       </article>`;
@@ -309,8 +311,9 @@
       <div class="ic">${I.swap}<span>${t('trustReturn')}</span></div>
     </div>`;
 
+  const catPhoto = (c) => (S.settings.categoryPhotos || {})[c.id] || '';
   const catIcon = (c) =>
-    c.photo ? img(c.photo, 120, 120, 'ph', '', { crop: 'faces' })
+    catPhoto(c) ? img(catPhoto(c), 120, 120, 'ph', '', { crop: 'faces' })
       : c.id === 'sale' ? '<span class="cat-glyph">%</span>'
         : `<img class="cat-logo" src="${S.logo.icon}" alt="">`;
 
@@ -329,7 +332,7 @@
           .map((c) => `<button class="circle cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}"><span class="circle-img">${catIcon(c)}</span><span>${L(c)}</span></button>`)
           .join('')}</nav>
         <button class="banner" data-action="cat" data-cat="all">
-          ${img(S.banner, 560, 320, 'banner-img', '', { eager: true })}
+          ${img(S.settings.banner, 560, 320, 'banner-img', '', { eager: true })}
           <span class="banner-text">
             <small>${t('bannerKicker')}</small>
             <b>${t('bannerTitle')}</b>
@@ -357,7 +360,7 @@
     const colorOpts = p.colors.map((x, i) => `
       <button class="color-opt ${i === sel.color ? 'on' : ''}" data-action="color" data-i="${i}" aria-pressed="${i === sel.color}">
         <span class="thumb" style="background:${x.hex}">${x.photo ? img(x.photo, 64, 80, 'ph') : ''}</span>
-        <span>${L(x)}</span>
+        <span>${E(x)}</span>
       </button>`).join('');
 
     return `
@@ -369,7 +372,7 @@
       </div>
 
       <div class="sec pd-info">
-        <h1 class="pd-name">${L(p.name)}</h1>
+        <h1 class="pd-name">${E(p.name)}</h1>
         <div class="pd-price">
           <span>${money(p.price)}</span>
           ${p.oldPrice ? `<span class="pd-old"><s>${money(p.oldPrice)}</s><span class="pill sale">−${d}%</span></span>` : ''}
@@ -377,12 +380,12 @@
         <div class="pd-sub"><i class="dot-ok"></i>${t('inStock')}</div>
       </div>
 
-      ${section(`${t('color')}: <b>${L(c)}</b>`, `<div class="colors">${colorOpts}</div>`)}
+      ${section(`${t('color')}: <b>${E(c)}</b>`, `<div class="colors">${colorOpts}</div>`)}
       ${section(`${t('size')}${sel.size ? `: <b>${sel.size}</b>` : ''}`,
-        `<div class="sizes" id="sizes">${p.sizes.map((s) => `<button class="sz ${s === sel.size ? 'on' : ''}" data-action="size" data-s="${esc(s)}" aria-pressed="${s === sel.size}">${s}</button>`).join('')}</div>`)}
-      ${section(t('description'), `<p class="pd-desc">${L(p.desc)}</p>`)}
+        `<div class="sizes" id="sizes">${p.sizes.map((s) => `<button class="sz ${s === sel.size ? 'on' : ''}" data-action="size" data-s="${esc(s)}" aria-pressed="${s === sel.size}">${esc(s)}</button>`).join('')}</div>`)}
+      ${L(p.desc) ? section(t('description'), `<p class="pd-desc">${E(p.desc)}</p>`) : ''}
       ${section('', `
-        <div class="cell">${isq(I.truck)}<div class="cell-main"><div class="cell-title">${t('perkDelivery')}</div><div class="cell-sub">${t('perkDeliverySub')}</div></div></div>
+        <div class="cell">${isq(I.truck)}<div class="cell-main"><div class="cell-title">${t('perkDelivery')}</div><div class="cell-sub">${t('perkDeliverySub').replace('{x}', money(S.settings.freeFrom))}</div></div></div>
         <div class="cell">${isq(I.shirt)}<div class="cell-main"><div class="cell-title">${t('perkFitting')}</div><div class="cell-sub">${t('perkFittingSub')}</div></div></div>
         <div class="cell">${isq(I.swap)}<div class="cell-main"><div class="cell-title">${t('perkReturn')}</div><div class="cell-sub">${t('perkReturnSub')}</div></div></div>`,
         '', 'icons gap-top')}`;
@@ -395,8 +398,8 @@
       <div class="cell ci">
         <button class="ci-img" data-action="open" data-id="${p.id}" data-color="${it.color}" data-size="${esc(it.size)}" aria-label="${esc(L(p.name))}">${img(gallery(p, it.color)[0], 56, 70, 'ph', L(p.name))}</button>
         <div class="cell-main">
-          <div class="ci-name">${L(p.name)}</div>
-          <div class="cell-sub">${L(c)} · ${it.size}</div>
+          <div class="ci-name">${E(p.name)}</div>
+          <div class="cell-sub">${E(c)} · ${esc(it.size)}</div>
           <div class="ci-row">
             <span class="ci-price">${money(p.price * it.qty)}</span>
             <span class="stepper">
@@ -412,9 +415,9 @@
   function viewCart() {
     if (!state.cart.length) return pageHead(t('cart')) + empty(I.bag, t('cartEmpty'), t('cartEmptyHint'));
     const sum = cartSum();
-    const left = S.delivery.freeFrom - sum;
+    const left = S.settings.freeFrom - sum;
     const hint = left > 0
-      ? `<div class="bar"><i style="width:${Math.min(100, (sum / S.delivery.freeFrom) * 100)}%"></i></div>${t('freeLeft').replace('{x}', `<b>${money(left)}</b>`)}`
+      ? `<div class="bar"><i style="width:${Math.min(100, (sum / S.settings.freeFrom) * 100)}%"></i></div>${t('freeLeft').replace('{x}', `<b>${money(left)}</b>`)}`
       : t('freeOk');
     return `
       ${pageHead(t('cart'), `<button class="link" data-action="clear">${t('clear')}</button>`)}
@@ -436,7 +439,7 @@
         <span class="cell-main"><span class="cell-title">${title}</span><span class="cell-sub">${sub}</span></span>
         <span class="tick ic ${value === current ? 'on' : ''}">${I.check}</span>
       </button>`;
-    const fee = cartSum() >= S.delivery.freeFrom ? t('free') : money(S.delivery.fee);
+    const fee = cartSum() >= S.settings.freeFrom ? t('free') : money(S.settings.deliveryFee);
 
     return `
       ${pageHead(t('checkoutTitle'))}
@@ -446,7 +449,7 @@
 
       ${section(t('receive'),
         option('method', 'delivery', f.method, I.truck, `${t('delivery')} · ${fee}`, t('deliverySub')) +
-        option('method', 'pickup', f.method, I.store, `${t('pickup')} · ${t('free')}`, `${t('pickupPoint')}, ${t('pickupHours')}`),
+        option('method', 'pickup', f.method, I.store, `${t('pickup')} · ${t('free')}`, [E(S.settings.pickupPoint), E(S.settings.pickupHours)].filter(Boolean).join(', ')),
         '', 'icons')}
 
       ${f.method === 'delivery' ? section(t('address'), input('address', '', t('addressPh'), 'autocomplete="street-address" maxlength="200"')) : ''}
@@ -458,7 +461,7 @@
 
       ${section(t('comment'), `<label class="cell field"><textarea data-field="comment" rows="2" maxlength="500" placeholder="${esc(t('commentPh'))}" aria-label="${esc(t('comment'))}">${esc(f.comment)}</textarea></label>`)}
 
-      ${section(t('yourOrder'), summary(), t('demoNote'))}`;
+      ${section(t('yourOrder'), summary())}`;
   }
 
   function viewSuccess() {
@@ -663,7 +666,20 @@
     window.scrollTo(0, y);
   }
 
-  function submitOrder() {
+  // Пока заказ отправляется, главная кнопка заблокирована и показывает «Отправляем…»
+  let submitting = false;
+  function setMainBusy(busy) {
+    if (inTG) {
+      if (busy) { tg.MainButton.disable(); tg.MainButton.showProgress(false); }
+      else { tg.MainButton.hideProgress(); tg.MainButton.enable(); }
+    } else {
+      $fbBtn.disabled = busy;
+      if (busy) $fbBtn.innerHTML = `<span class="mb-label">${esc(t('sending'))}</span>`;
+    }
+  }
+
+  async function submitOrder() {
+    if (submitting) return;
     const f = state.form, e = {};
     if (f.name.trim().length < 2) e.name = 1;
     if (f.phone.replace(/\D/g, '').length !== 12) e.phone = 1;
@@ -677,11 +693,46 @@
       if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    state.order = {
-      no: 1000 + Math.floor(Math.random() * 9000),
-      sum: cartSum(), fee: deliveryFee(), count: cartCount(),
-      method: f.method, pay: f.pay,
-    };
+    submitting = true;
+    setMainBusy(true);
+    let res = null, data = {};
+    try {
+      res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: f.name, phone: f.phone, method: f.method, address: f.address, pay: f.pay, comment: f.comment, lang: state.lang,
+          items: state.cart.map(({ id, color, size, qty }) => ({ id, color, size, qty })),
+          initData: inTG ? tg.initData : '',
+        }),
+      });
+      data = await res.json().catch(() => ({}));
+    } catch (err) {
+      res = null;
+    }
+    submitting = false;
+    setMainBusy(false);
+
+    if (!res || !res.ok) {
+      haptic('error');
+      if (data.error === 'stale' || data.error === 'empty') {
+        // цены или наличие поменялись в админке — обновляем каталог и показываем корзину
+        await loadCatalog().catch(() => {});
+        sanitizeState();
+        go('cart');
+        toast(t('orderStale'), 'warn');
+      } else if (['name', 'phone', 'address'].includes(data.error)) {
+        state.errors = { [data.error]: 1 };
+        render();
+        toast(t('fillRequired'), 'warn');
+      } else {
+        syncMain();
+        toast(t('orderError'), 'warn');
+      }
+      return;
+    }
+
+    state.order = data; // номер заказа и суммы — как их посчитал сервер
     ls.set('form', { name: f.name.trim(), phone: f.phone, address: f.address.trim() });
     state.form.comment = ''; // комментарий относится только к этому заказу
     state.cart = [];
@@ -762,12 +813,38 @@
   window.addEventListener('popstate', onPopState);
 
   // ---------- init ----------
-  // Данные из localStorage могли остаться от старой версии каталога — оставляем только валидное
-  state.cart = (Array.isArray(state.cart) ? state.cart : []).filter((i) => {
-    const p = i && product(i.id);
-    return p && p.colors[i.color] && p.sizes.includes(i.size) && Number.isInteger(i.qty) && i.qty > 0;
-  }).map((i) => ({ ...i, qty: Math.min(MAX_QTY, i.qty) }));
-  state.favs = (Array.isArray(state.favs) ? state.favs : []).filter((id) => product(id));
+  async function loadCatalog() {
+    const res = await fetch('/api/catalog', { cache: 'no-store' });
+    if (!res.ok) throw new Error('catalog ' + res.status);
+    const data = await res.json();
+    S.products = data.products || [];
+    S.settings = data.settings;
+  }
+
+  // Корзина/избранное из localStorage могли устареть (товар скрыт, цвет или размер убрали в админке)
+  function sanitizeState() {
+    state.cart = (Array.isArray(state.cart) ? state.cart : []).filter((i) => {
+      const p = i && product(i.id);
+      return p && p.colors[i.color] && p.sizes.includes(i.size) && Number.isInteger(i.qty) && i.qty > 0;
+    }).map((i) => ({ ...i, qty: Math.min(MAX_QTY, i.qty) }));
+    state.favs = (Array.isArray(state.favs) ? state.favs : []).filter((id) => product(id));
+    saveCart();
+    ls.set('favs', state.favs);
+  }
+
+  async function boot() {
+    $app.innerHTML = `<div class="boot"><img class="boot-logo" src="${S.logo.full}" alt="${S.brand}"><p>${t('loading')}</p></div>`;
+    try {
+      await loadCatalog();
+    } catch (e) {
+      $app.innerHTML = `<div class="boot"><img class="boot-logo" src="${S.logo.full}" alt="${S.brand}"><p>${t('loadError')}</p><button class="btn" id="retry">${t('retry')}</button></div>`;
+      document.getElementById('retry').addEventListener('click', boot);
+      return;
+    }
+    sanitizeState();
+    render();
+  }
+
   if (!I18N[state.lang]) state.lang = 'ru';
   const saved = ls.get('form', {});
   ['name', 'phone', 'address'].forEach((k) => { if (saved && typeof saved[k] === 'string' && saved[k]) state.form[k] = saved[k]; });
@@ -787,5 +864,6 @@
     if (nativeBack) tg.BackButton.onClick(back);
   }
 
-  render();
+  document.documentElement.lang = state.lang;
+  boot();
 })();
