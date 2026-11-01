@@ -47,9 +47,13 @@ body.has-tabbar.has-main #app { padding-bottom: calc(var(--tabbar-h) + 82px + va
   fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
 
-/* фото: плавное появление поверх «заглушки» */
-.ph { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--fill); opacity: 0; transition: opacity .3s; }
-.ph.ld { opacity: 1; }
+/* фото: пока грузится — мягкое мерцание в цветах бренда, затем плавное появление */
+.ph {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+  background: linear-gradient(100deg, rgba(176, 137, 62, .08) 30%, rgba(255, 255, 255, .7) 50%, rgba(176, 137, 62, .08) 70%) 0 0 / 220% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+.ph.ld { background: none; animation: ph-in .35s ease-out; }
 
 /* ---------- секции ---------- */
 .sec { overflow: hidden; border-radius: var(--r); background: var(--section); box-shadow: 0 1px 2px rgba(80, 60, 20, .04), 0 6px 16px rgba(80, 60, 20, .04); }
@@ -105,7 +109,7 @@ em.ok { color: var(--ok); }
 .circles { display: flex; justify-content: space-between; gap: 6px; margin: 18px -16px 0; padding: 4px 16px; overflow-x: auto; scrollbar-width: none; }
 .circles::-webkit-scrollbar { display: none; }
 .circle { flex: none; display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 60px; font-size: 11px; font-weight: 500; text-align: center; white-space: nowrap; }
-.circle-img { width: 60px; height: 60px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px var(--sep); transition: box-shadow .2s; }
+.circle-img { width: 60px; height: 60px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--page), 0 0 0 3px rgba(184, 137, 43, .35); transition: box-shadow .2s; }
 .circle.on .circle-img { box-shadow: 0 0 0 2px var(--page), 0 0 0 4px var(--accent); }
 .circle.on { color: var(--accent); font-weight: 600; }
 .cat-logo { width: 44px; height: auto; }
@@ -119,9 +123,26 @@ em.ok { color: var(--ok); }
 .banner b { max-width: 70%; margin: 4px 0 12px; font: 600 30px/1.05 var(--serif); }
 .banner-cta { padding: 7px 14px; border-radius: 999px; background: #fff; color: var(--text); font-size: 14px; font-weight: 600; }
 
-.list-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 26px 0 12px; padding: 0 2px; }
-.list-head span:first-child { font: 600 26px/1 var(--serif); }
-.list-head span:last-child { flex: none; font-size: 12px; color: var(--hint); }
+/* заголовок раздела: «Новинки ◆———— 15 товаров» */
+.list-head { display: flex; align-items: center; gap: 10px; margin: 28px 0 12px; padding: 0 2px; }
+.list-head span:first-child { flex: none; font: 600 26px/1 var(--serif); }
+.list-head span:last-child:not(:first-child) { flex: none; font-size: 12px; color: var(--hint); }
+.orn { position: relative; flex: 1; height: 1px; margin-left: 6px; background: linear-gradient(90deg, rgba(184, 137, 43, .55), rgba(184, 137, 43, 0)); }
+.orn::before { content: ''; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; background: var(--accent-bg); transform: rotate(45deg); }
+
+/* полоска преимуществ под баннером */
+.trust { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 12px; padding: 12px 4px; border-radius: var(--r); background: var(--section); box-shadow: 0 1px 2px rgba(80, 60, 20, .04), 0 6px 16px rgba(80, 60, 20, .04); }
+.trust > div { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 4px; text-align: center; }
+.trust > div + div { border-left: 1px solid var(--sep); }
+.trust svg { width: 22px; height: 22px; stroke: var(--accent); stroke-width: 1.6; }
+.trust span { font-size: 11px; line-height: 1.3; color: #5a4d3a; white-space: pre-line; }
+
+/* лента товаров со свайпом */
+.rail { display: flex; gap: 10px; margin: 0 -16px; padding: 2px 16px 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 16px; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail > .card { flex: 0 0 44%; scroll-snap-align: start; }
+.rail .price { font-size: 19px; }
+#promo .rail .pill:not(.sale) { display: none; } /* в ленте «Новинки» плашка «Новинка» лишняя */
 
 /* ---------- сетка товаров ---------- */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -150,7 +171,7 @@ em.ok { color: var(--ok); }
 .gal { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; background: var(--fill); }
 .gal::-webkit-scrollbar { display: none; }
 .gal .ph { flex: none; width: 100%; height: auto; aspect-ratio: 4 / 5; max-height: 68vh; scroll-snap-align: start; scroll-snap-stop: always; }
-.gal-dots { position: absolute; left: 50%; bottom: 12px; display: flex; gap: 5px; padding: 5px 7px; border-radius: 10px; background: rgba(0, 0, 0, .3); backdrop-filter: blur(8px); transform: translateX(-50%); }
+.gal-dots { position: absolute; left: 50%; bottom: 34px; display: flex; gap: 5px; padding: 5px 7px; border-radius: 10px; background: rgba(0, 0, 0, .3); backdrop-filter: blur(8px); transform: translateX(-50%); }
 .gal-dots i { width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .5); transition: width .2s, background .2s; }
 .gal-dots i.on { width: 14px; background: #fff; }
 .float-btn { position: absolute; top: 12px; width: 36px; height: 36px; }
@@ -159,11 +180,13 @@ em.ok { color: var(--ok); }
 .float-btn.fav { right: 12px; }
 .float-btn.fav svg { width: 20px; height: 20px; }
 
-.pd-info { margin-top: 12px; padding: 13px 16px 14px; }
-.pd-price { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 700 30px/1.15 var(--serif); font-variant-numeric: lining-nums; }
-.pd-price s { font: 400 14px var(--sans); color: var(--hint); }
-.pd-name { margin: 3px 0 0; font-size: 16px; font-weight: 500; line-height: 1.3; }
-.pd-sub { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--ok); }
+/* блок с названием и ценой «наезжает» на фото, как карточка-шторка */
+.pd-info { position: relative; z-index: 1; margin: -22px -4px 0; padding: 18px 18px 16px; border-radius: 24px; }
+.pd-name { margin: 0; font: 600 26px/1.15 var(--serif); }
+.pd-price { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 4px; margin-top: 8px; font: 700 28px/1.1 var(--serif); font-variant-numeric: lining-nums; color: #8f6618; /* тёмное золото — контрастнее на белом */ }
+.pd-old { display: inline-flex; align-items: center; gap: 8px; }
+.pd-old s { font: 400 14px var(--sans); color: var(--hint); }
+.pd-sub { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sep); font-size: 13px; color: var(--ok); }
 .dot-ok { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .pd-desc { margin: 0; padding: 12px 16px; line-height: 1.5; }
 
@@ -239,6 +262,7 @@ body.has-tabbar #tabbar { display: flex; }
 .tab { position: relative; flex: 1; max-width: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; font-weight: 500; color: var(--hint); }
 .tab svg { width: 26px; height: 26px; stroke-width: 1.7; }
 .tab.on { color: var(--accent); }
+.tab.on::before { content: ''; position: absolute; top: -1px; left: 50%; width: 24px; height: 2px; border-radius: 0 0 2px 2px; background: var(--accent-bg); transform: translateX(-50%); }
 .tab.on svg { stroke-width: 2.1; }
 .tab em {
   position: absolute; top: 3px; left: calc(50% + 6px);
@@ -278,6 +302,8 @@ body.has-tabbar.has-main #toast { bottom: calc(var(--tabbar-h) + 80px + var(--sa
 @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes ph-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* узкие телефоны (≈320–360px): переключатель языка не должен наезжать на логотип */
 @media (max-width: 360px) {

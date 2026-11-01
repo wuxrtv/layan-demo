@@ -285,14 +285,29 @@
     });
   }
 
+  // Заголовок раздела: название с засечками + золотая линия с ромбом, как в подписи логотипа
+  const listHead = (title, extra = '') =>
+    `<div class="list-head"><span>${title}</span><i class="orn" aria-hidden="true"></i>${extra ? `<span>${extra}</span>` : ''}</div>`;
+
+  // Горизонтальная лента товаров со свайпом
+  const rail = (title, list) =>
+    list.length ? `${listHead(title)}<div class="rail">${list.map((p) => card(p)).join('')}</div>` : '';
+
   function listBlock() {
     const list = filtered();
     const title = state.query.trim() ? t('results') : state.cat === 'all' ? t('allProducts') : L(S.categories.find((c) => c.id === state.cat));
     if (!list.length) return empty(I.search, t('nothingFound'), t('nothingFoundHint'), false);
     return `
-      <div class="list-head"><span>${title}</span><span>${countLabel(list.length)}</span></div>
-      <div class="grid">${list.map(card).join('')}</div>`;
+      ${listHead(title, countLabel(list.length))}
+      <div class="grid">${list.map((p) => card(p)).join('')}</div>`;
   }
+
+  const trustRow = () => `
+    <div class="trust">
+      <div class="ic">${I.truck}<span>${t('trustDelivery')}</span></div>
+      <div class="ic">${I.shirt}<span>${t('trustFitting')}</span></div>
+      <div class="ic">${I.swap}<span>${t('trustReturn')}</span></div>
+    </div>`;
 
   const catIcon = (c) =>
     c.photo ? img(c.photo, 120, 120, 'ph', '', { crop: 'faces' })
@@ -321,13 +336,15 @@
             <span class="banner-cta">${t('bannerCta')}</span>
           </span>
         </button>
+        ${trustRow()}
+        ${rail(t('newArrivals'), S.products.filter((p) => p.tags && p.tags.includes('new')))}
       </div>
       <div id="list">${listBlock()}</div>`;
   }
 
   function viewFavs() {
     const list = S.products.filter((p) => state.favs.includes(p.id));
-    return pageHead(t('favs')) + (list.length ? `<div class="grid">${list.map(card).join('')}</div>` : empty(I.heart, t('favsEmpty'), t('favsEmptyHint')));
+    return pageHead(t('favs')) + (list.length ? `<div class="grid">${list.map((p) => card(p)).join('')}</div>` : empty(I.heart, t('favsEmpty'), t('favsEmptyHint')));
   }
 
   function viewProduct() {
@@ -352,8 +369,11 @@
       </div>
 
       <div class="sec pd-info">
-        <div class="pd-price">${money(p.price)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s><span class="pill sale">−${d}%</span>` : ''}</div>
         <h1 class="pd-name">${L(p.name)}</h1>
+        <div class="pd-price">
+          <span>${money(p.price)}</span>
+          ${p.oldPrice ? `<span class="pd-old"><s>${money(p.oldPrice)}</s><span class="pill sale">−${d}%</span></span>` : ''}
+        </div>
         <div class="pd-sub"><i class="dot-ok"></i>${t('inStock')}</div>
       </div>
 
@@ -399,7 +419,8 @@
     return `
       ${pageHead(t('cart'), `<button class="link" data-action="clear">${t('clear')}</button>`)}
       ${section('', state.cart.map(cartItem).join(''), state.form.method === 'pickup' ? '' : hint, 'thumbs')}
-      ${section(t('total'), summary())}`;
+      ${section(t('total'), summary())}
+      ${rail(t('mayLike'), S.products.filter((p) => !state.cart.some((i) => i.id === p.id)).slice(0, 8))}`;
   }
 
   function viewCheckout() {
@@ -630,7 +651,7 @@
     if (state.view !== 'home') { go('home'); return; }
     document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c.dataset.cat === id));
     document.getElementById('list').innerHTML = listBlock();
-    const head = document.querySelector('.list-head');
+    const head = document.querySelector('#list .list-head');
     if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
