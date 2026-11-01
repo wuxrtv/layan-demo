@@ -1,6 +1,12 @@
-// GET /api/admin/me — кто вошёл и настроены ли уведомления в Telegram
+// GET /api/admin/me — кто вошёл и куда приходят уведомления о заказах
 import { json } from '../../../lib/http.js';
+import { notifyTargets } from '../../../lib/telegram.js';
 
 export function onRequestGet({ data, env }) {
-  return json({ email: data.admin.email, telegram: !!(env.TG_BOT_TOKEN && env.TG_CHAT_ID) });
+  const a = data.admin;
+  return json({
+    name: [a.first_name, a.username ? '@' + a.username : ''].filter(Boolean).join(' '),
+    telegram: !!env.TG_BOT_TOKEN && notifyTargets(env).length > 0,
+    notifyTo: env.TG_CHAT_ID ? 'group' : 'admins',
+  });
 }

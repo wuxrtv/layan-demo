@@ -1,5 +1,10 @@
 # Cloudflare Pages: магазин (public/) + API (functions/) + база D1.
-# Секреты TG_BOT_TOKEN и TG_CHAT_ID задаются в панели Cloudflare (Settings → Variables and Secrets), не здесь.
+#
+# Секреты задаются в панели Cloudflare (Workers & Pages → layan-shop → Settings → Variables and Secrets),
+# в этом файле их нет:
+#   TG_BOT_TOKEN  — токен бота от @BotFather (вход в админку и уведомления о заказах)
+#   ADMIN_TG_IDS  — Telegram ID администраторов через запятую (ID видно в админке при первом входе)
+#   TG_CHAT_ID    — необязательно: ID группы менеджеров; если не задан, заказы приходят администраторам в личку
 name = "layan-shop"
 pages_build_output_dir = "public"
 compatibility_date = "2025-09-01"
@@ -7,11 +12,4 @@ compatibility_date = "2025-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "layan"
-database_id = "00000000-0000-0000-0000-000000000000" # заменить на ID базы из Cloudflare
-
-[vars]
-# Вход в админку — Cloudflare Access (Zero Trust). Заполняется после настройки Access.
-ACCESS_TEAM_DOMAIN = ""
-ACCESS_AUD = ""
-# Почты, которым разрешён вход (через запятую)
-ADMIN_EMAILS = "layanliveee@gmail.com"
+database_id = "4f4ee2c6-7aaa-464b-b123-b8c3d332567b"

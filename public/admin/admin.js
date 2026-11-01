@@ -1,8 +1,26 @@
 (function () {
   'use strict';
 
+  // Админка открывается из бота как Telegram Mini App: подпись initData — это и есть вход
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const initData = (tg && tg.initData) || '';
+  if (tg && initData) {
+    tg.ready();
+    tg.expand();
+    try {
+      if (tg.isVersionAtLeast('6.1')) tg.setBackgroundColor('#fbf6ec');
+      if (tg.isVersionAtLeast('6.9')) tg.setHeaderColor('#fbf6ec');
+    } catch (e) { /* старый клиент */ }
+  }
+
+  // В Telegram обычный confirm() работает не везде — используем окно Telegram
+  const ask = (msg) => new Promise((resolve) => {
+    if (tg && initData && tg.isVersionAtLeast('6.2')) tg.showConfirm(msg, (ok) => resolve(!!ok));
+    else resolve(window.confirm(msg));
+  });
+
   // ---------- helpers ----------
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc =(s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => String(n ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
   const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -49,17 +67,20 @@
   }
 
   async function api(path, { method = 'GET', body, raw } = {}) {
+    const headers = { 'x-tg-init-data': initData };
+    if (raw) headers['content-type'] = raw.type;
+    else if (body) headers['content-type'] = 'application/json';
     const res = await fetch('/api/admin' + path, {
       method,
-      headers: raw ? { 'content-type': raw.type } : body ? { 'content-type': 'application/json' } : {},
+      headers,
       body: raw || (body ? JSON.stringify(body) : undefined),
       cache: 'no-store',
     });
-    if (res.status === 401) {
-      renderLogin();
-      throw new Error('Нужно войти');
-    }
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403 || res.status === 503) {
+      renderLogin(res.status, data);
+      throw new Error(data.error || 'Нет доступа');
+    }
     if (!res.ok) throw new Error(data.error || 'Ошибка сервера');
     return data;
   }
@@ -129,15 +150,30 @@
   }
 
   function render() {
+    if (blocked) return;
     renderNav();
     if (state.tab === 'orders') $app.innerHTML = viewOrders();
     else if (state.tab === 'products') $app.innerHTML = state.draft ? viewEditor() : viewProducts();
     else $app.innerHTML = viewSettings();
   }
 
-  function renderLogin() {
+  let blocked = false;
+  function renderLogin(status, data) {
+    blocked = true;
     $nav.innerHTML = '';
-    $app.innerHTML = `<div class="adm-empty"><p>Сессия закончилась. Войдите снова — код придёт на почту.</p><button class="btn" onclick="location.reload()">Войти</button></div>`;
+    let msg;
+    if (status === 403) {
+      msg = `<p><b>Нет доступа к админке.</b></p>
+        <p>Ваш Telegram ID: <b class="tg-id">${esc(data.tgId)}</b></p>
+        <p>Чтобы получить доступ, этот ID нужно добавить в список администраторов (ADMIN_TG_IDS в настройках Cloudflare).</p>`;
+    } else if (status === 503) {
+      msg = `<p>${esc(data.error || 'Админка ещё не настроена.')}</p>`;
+    } else if (!initData) {
+      msg = `<p><b>Откройте админку через бота в Telegram.</b></p><p>Вход происходит автоматически по вашему Telegram-аккаунту — пароль не нужен.</p>`;
+    } else {
+      msg = `<p>Вход устарел. Закройте и снова откройте админку из бота.</p>`;
+    }
+    $app.innerHTML = `<div class="adm-empty">${msg}</div>`;
   }
 
   // ---------- заказы ----------
@@ -249,8 +285,8 @@
     window.scrollTo(0, 0);
   }
 
-  function closeEditor(force) {
-    if (!force && state.dirty && !confirm('Изменения не сохранены. Выйти без сохранения?')) return;
+  async function closeEditor(force) {
+    if (!force && state.dirty && !(await ask('Изменения не сохранены. Выйти без сохранения?'))) return;
     state.draft = null;
     state.draftId = null;
     state.dirty = false;
@@ -433,7 +469,7 @@
 
       <section class="form-sec">
         <h2>Уведомления о заказах</h2>
-        <div class="tg-status ${tgOn ? 'on' : ''}"><i></i><span>${tgOn ? 'Новые заказы приходят в Telegram.' : 'Telegram не подключён: добавьте TG_BOT_TOKEN и TG_CHAT_ID в настройках проекта Cloudflare.'}</span></div>
+        <div class="tg-status ${tgOn ? 'on' : ''}"><i></i><span>${tgOn ? (state.me.notifyTo === 'group' ? 'Новые заказы приходят в группу менеджеров в Telegram.' : 'Новые заказы приходят администраторам в Telegram от бота.') : 'Уведомления не настроены: нужен TG_BOT_TOKEN и ADMIN_TG_IDS в настройках Cloudflare.'}</span></div>
       </section>
 
       <div class="save-bar"><div>
@@ -467,7 +503,7 @@
     const d = el.dataset;
     switch (d.act) {
       case 'tab':
-        if (state.tab === 'products' && state.draft && state.dirty && !confirm('Изменения не сохранены. Уйти без сохранения?')) return;
+        if (state.tab === 'products' && state.draft && state.dirty && !(await ask('Изменения не сохранены. Уйти без сохранения?'))) return;
         state.tab = d.v;
         state.draft = null;
         render();
@@ -489,7 +525,7 @@
       case 'close': closeEditor(false); break;
       case 'save': saveProduct(); break;
       case 'delete':
-        if (!confirm('Удалить товар безвозвратно? Можно вместо этого просто скрыть его переключателем.')) return;
+        if (!(await ask('Удалить товар безвозвратно? Можно вместо этого просто скрыть его переключателем.'))) return;
         try {
           await api('/products/' + state.draftId, { method: 'DELETE' });
           toast('Товар удалён');
@@ -555,7 +591,7 @@
   render();
   api('/me').then((me) => {
     state.me = me;
-    document.getElementById('me').textContent = me.email;
+    document.getElementById('me').textContent = me.name || 'админ-панель';
     loadOrders();
   }).catch(() => {});
 })();
