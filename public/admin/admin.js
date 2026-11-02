@@ -54,6 +54,7 @@
     settings: null, me: null,
     draft: null, draftId: null, dirty: false, // редактируемый товар
     settingsDraft: null,
+    admins: [], newAdmin: { tgId: '', name: '' }, addingAdmin: false,
     saving: false,
     uploading: {}, // путь поля → true, пока грузится фото
   };
@@ -165,7 +166,7 @@
     if (status === 403) {
       msg = `<p><b>Нет доступа к админке.</b></p>
         <p>Ваш Telegram ID: <b class="tg-id">${esc(data.tgId)}</b></p>
-        <p>Чтобы получить доступ, этот ID нужно добавить в список администраторов (ADMIN_TG_IDS в настройках Cloudflare).</p>`;
+        <p>Отправьте этот ID владельцу магазина — он добавит вас в разделе «Настройки → Администраторы». После этого просто откройте админку снова.</p>`;
     } else if (status === 503) {
       msg = `<p>${esc(data.error || 'Админка ещё не настроена.')}</p>`;
     } else if (!initData) {
@@ -425,9 +426,10 @@
   // ---------- настройки ----------
   async function loadSettings() {
     try {
-      const [{ settings }, me] = await Promise.all([api('/settings'), state.me ? Promise.resolve(state.me) : api('/me')]);
+      const [{ settings }, me, { admins }] = await Promise.all([api('/settings'), api('/me'), api('/admins')]);
       state.settings = settings;
       state.me = me;
+      state.admins = admins;
       state.settingsDraft = clone(settings);
       render();
     } catch (e) {
@@ -467,14 +469,80 @@
         <div class="tiles">${Object.entries(CATS).map(([id, label]) => `<div>${photoTile('settings', `categoryPhotos.${id}`, s.categoryPhotos[id], { cls: 'round', w: 72, h: 72 })}<span class="tile-cap">${label}</span></div>`).join('')}</div>
       </section>
 
+      ${viewAdmins()}
+
       <section class="form-sec">
         <h2>Уведомления о заказах</h2>
-        <div class="tg-status ${tgOn ? 'on' : ''}"><i></i><span>${tgOn ? (state.me.notifyTo === 'group' ? 'Новые заказы приходят в группу менеджеров в Telegram.' : 'Новые заказы приходят администраторам в Telegram от бота.') : 'Уведомления не настроены: нужен TG_BOT_TOKEN и ADMIN_TG_IDS в настройках Cloudflare.'}</span></div>
+        <div class="tg-status ${tgOn ? 'on' : ''}"><i></i><span>${tgOn ? (state.me.notifyTo === 'group' ? 'Новые заказы приходят в группу менеджеров в Telegram.' : 'Новые заказы приходят в Telegram администраторам, у которых включён переключатель «заказы».') : 'Уведомления выключены у всех администраторов.'}</span></div>
       </section>
 
       <div class="save-bar"><div>
         <button class="btn-sm" data-act="save-settings" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить настройки'}</button>
       </div></div>`;
+  }
+
+  // ---------- администраторы ----------
+  function viewAdmins() {
+    const me = state.me || {};
+    const isOwner = me.role === 'owner';
+    const link = me.bot ? `t.me/${me.bot}/admin` : '';
+    const rows = (state.admins || []).map((a) => {
+      const self = a.tg_id === String(me.id);
+      const title = a.name || a.username ? `${esc(a.name)}${a.username ? ` <span class="muted">@${esc(a.username)}</span>` : ''}` : '<span class="muted">ещё не заходил</span>';
+      const canToggle = isOwner || self;
+      const canRemove = isOwner && a.role !== 'owner';
+      return `
+        <div class="adm-row">
+          <div class="adm-main">
+            <b>${title}</b>
+            <small>ID ${esc(a.tg_id)} · ${a.role === 'owner' ? 'владелец' : 'администратор'}${self ? ' · это вы' : ''}</small>
+          </div>
+          <div class="adm-side">
+            <span class="muted">заказы</span>
+            <button class="switch ${a.notify ? 'on' : ''}" data-act="adm-notify" data-id="${esc(a.tg_id)}" aria-label="Получать заказы в Telegram" aria-pressed="${a.notify}" ${canToggle ? '' : 'disabled'}></button>
+            ${canRemove ? `<button class="btn-ghost danger" data-act="adm-rm" data-id="${esc(a.tg_id)}">Убрать</button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    const nd = state.newAdmin;
+    const form = isOwner ? `
+      <div class="adm-add">
+        <div class="f-2">
+          <label class="f"><span>Telegram ID</span><input data-abind="tgId" value="${esc(nd.tgId)}" inputmode="numeric" placeholder="например 7567850330"></label>
+          <label class="f"><span>Имя (для себя)</span><input data-abind="name" value="${esc(nd.name)}" maxlength="60" placeholder="Менеджер Дилноза"></label>
+        </div>
+        <button class="btn-sm" data-act="adm-add" ${state.addingAdmin ? 'disabled' : ''}>${state.addingAdmin ? 'Добавляем…' : '+ Добавить администратора'}</button>
+        <p class="hint">Как узнать Telegram ID: пусть человек откроет админку${link ? ` по ссылке <b>${esc(link)}</b>` : ' из бота'} — на экране «Нет доступа» будет его ID. После добавления бот пришлёт ему кнопку для входа (если он хоть раз нажимал «Start» в боте).</p>
+      </div>` : '<p class="hint">Добавлять и убирать администраторов может только владелец.</p>';
+    return `
+      <section class="form-sec">
+        <h2>Администраторы</h2>
+        <div class="adm-list">${rows || '<p class="muted">Пока никого</p>'}</div>
+        ${form}
+      </section>`;
+  }
+
+  async function reloadAdmins() {
+    const [{ admins }, me] = await Promise.all([api('/admins'), api('/me')]);
+    state.admins = admins;
+    state.me = me;
+    render();
+  }
+
+  async function addAdmin() {
+    if (state.addingAdmin) return;
+    state.addingAdmin = true;
+    render();
+    try {
+      const { notified } = await api('/admins', { method: 'POST', body: state.newAdmin });
+      state.newAdmin = { tgId: '', name: '' };
+      toast(notified ? 'Администратор добавлен, бот отправил ему кнопку входа' : 'Администратор добавлен. Пусть откроет админку из бота');
+      await reloadAdmins();
+    } catch (e) {
+      toast(e.message, true);
+    }
+    state.addingAdmin = false;
+    render();
   }
 
   async function saveSettings() {
@@ -559,6 +627,25 @@
         break;
       }
       case 'save-settings': saveSettings(); break;
+      case 'adm-add': addAdmin(); break;
+      case 'adm-notify': {
+        const a = state.admins.find((x) => x.tg_id === d.id);
+        a.notify = !a.notify;
+        render();
+        try {
+          await api('/admins/' + encodeURIComponent(d.id), { method: 'PATCH', body: { notify: a.notify } });
+          await reloadAdmins();
+        } catch (e) { a.notify = !a.notify; render(); toast(e.message, true); }
+        break;
+      }
+      case 'adm-rm':
+        if (!(await ask('Убрать администратора? Он больше не сможет открыть админку и получать заказы.'))) return;
+        try {
+          await api('/admins/' + encodeURIComponent(d.id), { method: 'DELETE' });
+          toast('Администратор убран');
+          await reloadAdmins();
+        } catch (e) { toast(e.message, true); }
+        break;
     }
   });
 
@@ -578,6 +665,7 @@
       state.dirty = true;
     }
     if (el.dataset.sbind && state.settingsDraft) setAt(state.settingsDraft, el.dataset.sbind, el.value);
+    if (el.dataset.abind) state.newAdmin[el.dataset.abind] = el.value;
   });
 
   window.addEventListener('beforeunload', (ev) => {

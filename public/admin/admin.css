@@ -112,6 +112,19 @@ body { padding-bottom: calc(24px + var(--safe-b)); }
 .save-bar .btn-ghost { height: 46px; }
 .save-bar button:disabled { opacity: .6; }
 
+/* администраторы */
+.adm-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.adm-row + .adm-row { border-top: 1px solid var(--sep); }
+.adm-main { flex: 1; min-width: 0; }
+.adm-main b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.adm-main small { display: block; font-size: 12px; color: var(--hint); }
+.adm-side { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 8px; font-size: 12px; }
+.adm-side .btn-ghost { height: 30px; padding: 0 10px; }
+.adm-add { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--sep); }
+.adm-add .btn-sm { width: 100%; justify-content: center; margin-top: 10px; }
+.switch:disabled { opacity: .45; cursor: default; }
+.tg-id { font-size: 18px; user-select: all; }
+
 .tg-status { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
 .tg-status i { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--danger); }
 .tg-status.on i { background: var(--ok); }

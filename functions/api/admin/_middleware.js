@@ -6,7 +6,7 @@ import { verifyAdmin } from '../../../lib/auth.js';
 export async function onRequest(context) {
   const { request, env } = context;
   if (env.DEV_NO_AUTH === '1') {
-    context.data.admin = { id: 0, first_name: 'Локальный режим', username: '' };
+    context.data.admin = { id: '0', first_name: 'Локальный режим', username: '', role: 'owner' };
     return context.next();
   }
   let result;
