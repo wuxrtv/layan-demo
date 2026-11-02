@@ -306,13 +306,17 @@
 
   function viewHome() {
     const searching = !!state.query.trim();
-    return `
+    const head = `
       <header class="hero-head">
         <div class="seg lang">${['ru', 'uz']
           .map((l) => `<button class="${state.lang === l ? 'on' : ''}" data-action="lang" data-v="${l}">${l.toUpperCase()}</button>`)
           .join('')}</div>
         <img class="hero-logo" src="${S.logo.full}" alt="${esc(`${S.brand} — ${t('tagline')}`)}">
-      </header>
+      </header>`;
+    // каталог ещё пустой (товары не добавлены в админке) — без поиска, баннера и вкладок
+    if (!S.products.length) return head + empty(I.bag, t('soonTitle'), t('soonHint'), false);
+    return `
+      ${head}
       <label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${esc(t('search'))}" aria-label="${esc(t('search'))}" value="${esc(state.query)}" autocomplete="off"></label>
       <div id="promo" ${searching ? 'hidden' : ''}>
         <button class="banner" data-action="cat" data-cat="all">

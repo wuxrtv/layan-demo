@@ -309,7 +309,7 @@
     return `
       <div class="adm-title"><h1>Товары</h1><button class="btn-sm" data-act="new">Добавить</button></div>
       <label class="search ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="pq" type="search" placeholder="Поиск" value="${esc(state.query)}" autocomplete="off"></label>
-      ${!state.productsLoaded ? '<div class="adm-empty">Загружаем…</div>' : list.length ? `<div class="p-list">${rows}</div>` : '<div class="adm-empty">Ничего не найдено</div>'}`;
+      ${!state.productsLoaded ? '<div class="adm-empty">Загружаем…</div>' : list.length ? `<div class="p-list">${rows}</div>` : `<div class="adm-empty">${state.products.length ? 'Ничего не найдено' : 'Товаров пока нет. Нажмите «Добавить»'}</div>`}`;
   }
 
   const blankProduct = () => ({
