@@ -362,12 +362,12 @@
 
   function photoTile(scope, path, src, opts = {}) {
     const loading = state.uploading[scope + ':' + path];
-    if (!src && !loading) return `<button class="tile add ${opts.cls || ''}" data-act="upload" data-scope="${scope}" data-path="${path}" aria-label="Загрузить фото">+</button>`;
+    if (!src && !loading) return `<button class="tile add ${opts.cls || ''}" data-act="upload" data-scope="${scope}" data-path="${path}" aria-label="Загрузить фото"><svg viewBox="0 0 24 24">${ICONS.imagePlus}</svg><span>Фото</span></button>`;
     return `
       <div class="tile ${opts.cls || ''} ${loading ? 'loading' : ''}">
         ${pic(src, opts.w || 72, opts.h || 90)}
         <button style="position:absolute;inset:0" data-act="upload" data-scope="${scope}" data-path="${path}" aria-label="Заменить фото"></button>
-        ${opts.removable ? `<button class="x" data-act="rm-photo" data-scope="${scope}" data-path="${path}" aria-label="Удалить фото">×</button>` : ''}
+        ${opts.removable ? `<button class="x" data-act="rm-photo" data-scope="${scope}" data-path="${path}" aria-label="Удалить фото"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>` : ''}
       </div>`;
   }
 
@@ -414,11 +414,13 @@
         ${open ? `${colorCards}<button class="btn-main add-row" data-act="add-color"><svg viewBox="0 0 24 24">${ICONS.plus}</svg>Добавить цвет</button>` : ''}
 
         <div class="sub-head">${secHead('image', 'Фото')}</div>
-        ${extra || addingExtra ? `<div class="tiles">${extra}${addingExtra ? '<div class="tile loading"></div>' : ''}</div>` : ''}
-        <button class="drop" data-act="upload" data-scope="draft" data-path="photos" data-push="1">
-          <svg viewBox="0 0 24 24">${ICONS.imagePlus}</svg>
-          <span><b>Загрузите фото</b><small>JPG, PNG до 10 МБ</small></span>
-        </button>
+        ${extra || addingExtra
+          // есть фото — ровная сетка 3 в ряд, «Добавить» — такая же плитка (до 10 фото)
+          ? `<div class="photo-grid">${extra}${addingExtra ? '<div class="tile loading"></div>' : ''}${d.photos.length < 10 ? `<button class="tile add" data-act="upload" data-scope="draft" data-path="photos" data-push="1"><svg viewBox="0 0 24 24">${ICONS.imagePlus}</svg><span>Добавить</span></button>` : ''}</div>`
+          : `<button class="drop" data-act="upload" data-scope="draft" data-path="photos" data-push="1">
+              <svg viewBox="0 0 24 24">${ICONS.imagePlus}</svg>
+              <span><b>Загрузите фото</b><small>JPG, PNG до 10 МБ</small></span>
+            </button>`}
 
         <div class="sub-head">${secHead('ruler', 'Размеры')}<small>Через запятую</small></div>
         <input class="plain" data-bind="sizesText" value="${esc(d.sizesText)}" placeholder="S, M, L, XL" aria-label="Размеры">

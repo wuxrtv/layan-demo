@@ -148,7 +148,16 @@ input.plain { background: #f8f8fa; }
 .tile.add { border: 1.5px dashed #d6d6dc; background: #fcfcfd; color: var(--hint); font-size: 26px; font-weight: 300; transition: border-color .2s, color .2s; }
 .tile.add:active { border-color: var(--text); color: var(--text); }
 .tile.wide { width: 100%; height: 170px; border-radius: 14px; }
-.tile .x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(20, 20, 20, .7); color: #fff; font-size: 15px; line-height: 1; }
+/* удалить фото — заметный белый кружок с крестиком, область нажатия 40px */
+.tile .x { position: absolute; top: 0; right: 0; z-index: 1; width: 40px; height: 40px; border-radius: 50%; }
+.tile .x::before { content: ''; position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(16, 24, 40, .22); }
+.tile .x svg { position: relative; width: 14px; height: 14px; fill: none; stroke: var(--text); stroke-width: 2.4; stroke-linecap: round; }
+
+/* дополнительные фото: сетка 3 в ряд, все плитки одного размера 4:5 */
+.photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.photo-grid .tile { width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 14px; }
+.tile.add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.tile.add svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .tile.loading::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, var(--surface-2) 30%, #faf9f7 50%, var(--surface-2) 70%) 0 0 / 220% 100%; animation: shimmer 1.3s linear infinite; }
 
 /* поле загрузки фото */
