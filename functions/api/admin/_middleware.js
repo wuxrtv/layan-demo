@@ -17,7 +17,7 @@ export async function onRequest(context) {
     result = { status: 500, error: 'Ошибка проверки входа' };
   }
   if (!result.admin) {
-    return json({ error: result.error, tgId: result.tgId }, { status: result.status });
+    return json({ error: result.error, reason: result.reason, tgId: result.tgId }, { status: result.status });
   }
   context.data.admin = result.admin;
   return context.next();

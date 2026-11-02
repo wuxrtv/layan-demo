@@ -1,7 +1,7 @@
 // GET  /api/admin/admins — список администраторов
 // POST /api/admin/admins — добавить администратора по Telegram ID (только владелец)
 import { json, fail, handle, readJson } from '../../../../lib/http.js';
-import { ownerIds, sendMessage } from '../../../../lib/telegram.js';
+import { botToken, ownerIds, sendMessage } from '../../../../lib/telegram.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
@@ -29,7 +29,7 @@ export const onRequestPost = handle(async ({ request, env, data }) => {
   // бот сразу пишет новому администратору и присылает кнопку для входа
   // (дойдёт, если человек хотя бы раз нажимал «Start» в боте)
   let notified = false;
-  if (env.TG_BOT_TOKEN) {
+  if (botToken(env)) {
     const url = new URL('/admin/', request.url).toString();
     notified = await sendMessage(env, tgId,
       `<b>Вас добавили администратором магазина LAYAN.</b>\nНовые заказы будут приходить сюда. Админка открывается кнопкой ниже.${name ? `\n\nДобавил: ${esc(data.admin.first_name)}` : ''}`,

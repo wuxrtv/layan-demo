@@ -1,13 +1,13 @@
 // POST /api/orders — заказ из магазина: проверка, пересчёт по ценам из базы, сохранение, уведомление в Telegram
 import { json, handle, readJson } from '../../lib/http.js';
 import { buildOrder, getSettings, listProducts } from '../../lib/store.js';
-import { notifyOrder, verifyInitData } from '../../lib/telegram.js';
+import { botToken, notifyOrder, verifyInitData } from '../../lib/telegram.js';
 
 export const onRequestPost = handle(async ({ request, env, waitUntil }) => {
   const body = await readJson(request, 32 * 1024);
   const [products, settings] = await Promise.all([listProducts(env.DB, { onlyActive: true }), getSettings(env.DB)]);
   const order = buildOrder(body, products, settings);
-  const tgUser = await verifyInitData(body.initData, env.TG_BOT_TOKEN);
+  const tgUser = await verifyInitData(body.initData, botToken(env));
 
   const row = await env.DB.prepare(
     `INSERT INTO orders (name, phone, method, address, pay, comment, items, sum, fee, total, lang, tg_user)
