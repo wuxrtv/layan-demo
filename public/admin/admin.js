@@ -33,6 +33,23 @@
   }
   const pic = (src, w, h) => (src ? `<img class="ph" src="${esc(photoUrl(src, w, h))}" alt="" loading="lazy" onload="this.classList.add('ld')">` : '');
 
+  // контурные иконки 24×24 (рисуются через stroke, цвет — currentColor)
+  const ICONS = {
+    tag: '<path d="M3 12V4.5A1.5 1.5 0 014.5 3H12l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>',
+    palette: '<path d="M12 3a9 9 0 100 18c.9 0 1.5-.6 1.5-1.4 0-.4-.2-.7-.4-1-.3-.3-.4-.7-.4-1 0-.8.7-1.5 1.5-1.5H16a5 5 0 005-5C21 6.8 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="9.5" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-10 9"/>',
+    imagePlus: '<path d="M14 4H5.5A2.5 2.5 0 003 6.5v11A2.5 2.5 0 005.5 20H12"/><circle cx="9" cy="10" r="2"/><path d="M21 13l-3-3-9 9"/><circle cx="18.5" cy="18.5" r="3.5"/><path d="M18.5 17v3M17 18.5h3"/>',
+    ruler: '<path d="M3.5 16.5l13-13 4 4-13 13z"/><path d="M7.5 12.5l2 2M10.5 9.5l2 2M13.5 6.5l2 2"/>',
+    doc: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    truck: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+    pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.6a3.5 3.5 0 010 6.8M18 14a6.5 6.5 0 013.5 6"/>',
+    up: '<path d="M6 15l6-6 6 6"/>',
+    down: '<path d="M7 10l5 5 5-5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    trash: '<path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13M10 11v5.5M14 11v5.5"/>',
+  };
+
   const CATS = { women: 'Женщинам', men: 'Мужчинам', kids: 'Детям' };
   const STATUS = { new: 'Новый', confirmed: 'Подтверждён', delivered: 'Выполнен', cancelled: 'Отменён' };
   const FILTERS = [['new', 'Новые'], ['confirmed', 'В работе'], ['delivered', 'Выполнены'], ['cancelled', 'Отменены'], ['all', 'Все']];
@@ -52,7 +69,7 @@
     orders: [], counts: {}, ordersLoaded: false, ordersFor: null, // ordersFor — для какого фильтра загружен список
     products: [], productsLoaded: false, query: '',
     settings: null, me: null,
-    draft: null, draftId: null, dirty: false, // редактируемый товар
+    draft: null, draftId: null, dirty: false, colorsOpen: true, // редактируемый товар
     settingsDraft: null,
     admins: [], newAdmin: { tgId: '', name: '' }, addingAdmin: false,
     saving: false,
@@ -124,6 +141,7 @@
     const file = $file.files && $file.files[0];
     const target = uploadTarget;
     if (!file || !target) return;
+    if (file.size > 10 * 1024 * 1024) { toast('Фото больше 10 МБ — выберите другое', true); return; }
     const obj = target.scope === 'settings' ? state.settingsDraft : state.draft;
     const key = target.scope + ':' + target.path;
     state.uploading[key] = true;
@@ -337,27 +355,33 @@
       </div>`;
   }
 
+  // заголовок раздела-карточки: иконка, название и (необязательно) кнопка справа
+  const secHead = (icon, title, extra = '') =>
+    `<div class="sec-head"><svg class="sec-ic" viewBox="0 0 24 24">${ICONS[icon]}</svg><h2>${title}</h2>${extra}</div>`;
+
   function viewEditor() {
     const d = state.draft;
-    const colorRows = d.colors.map((c, i) => `
-      <div class="color-row">
-        ${photoTile('draft', `colors.${i}.photo`, c.photo)}
+    const colorCards = d.colors.map((c, i) => `
+      <div class="color-card">
+        ${photoTile('draft', `colors.${i}.photo`, c.photo, { cls: 'color-photo', w: 120, h: 150 })}
         <div class="color-fields">
-          <div class="f-2">${field('Цвет RU', `colors.${i}.ru`, 'maxlength="40" placeholder="Чёрный"')}${field('Цвет UZ', `colors.${i}.uz`, 'maxlength="40" placeholder="Qora"')}</div>
-          <div class="color-tools">
-            <label class="swatch"><input type="color" data-bind="colors.${i}.hex" value="${esc(c.hex)}"><i style="background:${esc(c.hex)}"></i>Оттенок</label>
-            ${d.colors.length > 1 ? `<button class="chip-btn danger" data-act="rm-color" data-i="${i}">Убрать</button>` : ''}
-          </div>
+          ${field('Цвет RU', `colors.${i}.ru`, 'maxlength="40" placeholder="Чёрный"')}
+          ${field('Цвет UZ', `colors.${i}.uz`, 'maxlength="40" placeholder="Qora"')}
+        </div>
+        <div class="color-tools">
+          <label class="swatch"><input type="color" data-bind="colors.${i}.hex" value="${esc(c.hex)}"><i style="background:${esc(c.hex)}"></i>Оттенок<svg viewBox="0 0 24 24">${ICONS.down}</svg></label>
+          ${d.colors.length > 1 ? `<button class="chip-btn danger" data-act="rm-color" data-i="${i}"><svg viewBox="0 0 24 24">${ICONS.trash}</svg>Убрать</button>` : ''}
         </div>
       </div>`).join('');
 
     const extra = d.photos.map((src, i) => photoTile('draft', `photos.${i}`, src, { removable: true })).join('');
     const addingExtra = state.uploading['draft:photos'];
+    const open = state.colorsOpen;
     return `
       <div class="adm-title sub"><button class="back" data-act="close" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>${state.draftId ? 'Товар' : 'Новый товар'}</h1></div>
 
-      <section class="form-sec">
-        <h2>Основное</h2>
+      <section class="form-sec card">
+        ${secHead('tag', 'Основное')}
         ${field('Название RU', 'name.ru', 'maxlength="120" placeholder="Платье макси"')}
         ${field('Название UZ', 'name.uz', 'maxlength="120" placeholder="Maksi ko‘ylak"')}
         <label class="f"><span>Категория</span><select data-bind="cat">${Object.entries(CATS).map(([v, l]) => `<option value="${v}" ${d.cat === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -369,29 +393,26 @@
         <div class="check"><span>Показывать в магазине</span><button class="switch ${d.active ? 'on' : ''}" data-act="draft-active" aria-label="Показывать в магазине" aria-pressed="${d.active}"></button></div>
       </section>
 
-      <section class="form-sec">
-        <h2>Цвета</h2>
-        ${colorRows}
-        <button class="btn-line add-row" data-act="add-color">+ Добавить цвет</button>
-      </section>
+      <section class="form-sec card">
+        ${secHead('palette', 'Цвета', `<button class="fold ${open ? 'open' : ''}" data-act="fold-colors" aria-label="${open ? 'Свернуть' : 'Развернуть'}" aria-expanded="${open}"><svg viewBox="0 0 24 24">${ICONS.up}</svg></button>`)}
+        ${open ? `${colorCards}<button class="btn-main add-row" data-act="add-color"><svg viewBox="0 0 24 24">${ICONS.plus}</svg>Добавить цвет</button>` : ''}
 
-      <section class="form-sec">
-        <h2>Фото</h2>
-        <div class="tiles">${extra}${addingExtra ? '<div class="tile loading"></div>' : ''}<button class="tile add" data-act="upload" data-scope="draft" data-path="photos" data-push="1" aria-label="Добавить фото">+</button></div>
-      </section>
+        <div class="sub-head">${secHead('image', 'Фото')}</div>
+        ${extra || addingExtra ? `<div class="tiles">${extra}${addingExtra ? '<div class="tile loading"></div>' : ''}</div>` : ''}
+        <button class="drop" data-act="upload" data-scope="draft" data-path="photos" data-push="1">
+          <svg viewBox="0 0 24 24">${ICONS.imagePlus}</svg>
+          <span><b>Загрузите фото</b><small>JPG, PNG до 10 МБ</small></span>
+        </button>
 
-      <section class="form-sec">
-        <h2>Размеры</h2>
-        <label class="f"><span>Через запятую</span><input data-bind="sizesText" value="${esc(d.sizesText)}" placeholder="S, M, L, XL"></label>
-      </section>
+        <div class="sub-head">${secHead('ruler', 'Размеры')}<small>Через запятую</small></div>
+        <input class="plain" data-bind="sizesText" value="${esc(d.sizesText)}" placeholder="S, M, L, XL" aria-label="Размеры">
 
-      <section class="form-sec">
-        <h2>Описание</h2>
+        <div class="sub-head">${secHead('doc', 'Описание')}</div>
         ${area('RU', 'desc.ru')}
         ${area('UZ', 'desc.uz')}
       </section>
 
-      ${state.draftId ? '<button class="btn-line danger del" data-act="delete">Удалить товар</button>' : ''}
+      ${state.draftId ? `<button class="chip-btn danger del" data-act="delete"><svg viewBox="0 0 24 24">${ICONS.trash}</svg>Удалить товар</button>` : ''}
 
       <div class="save-bar"><div>
         <button class="btn-main" data-act="save" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button>
@@ -451,20 +472,21 @@
     return `
       <div class="adm-title"><h1>Настройки</h1></div>
 
-      <section class="form-sec">
-        <h2>Доставка</h2>
+      <section class="form-sec card">
+        ${secHead('truck', 'Доставка')}
         <div class="f-2">${sumField('Стоимость', 'data-sbind', 'deliveryFee', s.deliveryFee, '25 000')}${sumField('Бесплатно от', 'data-sbind', 'freeFrom', s.freeFrom, '500 000')}</div>
       </section>
 
-      <section class="form-sec">
-        <h2>Самовывоз</h2>
+      <section class="form-sec card">
+        ${secHead('pin', 'Самовывоз')}
         ${sf('Адрес RU', 'pickupPoint.ru', 'maxlength="120"')}
         ${sf('Адрес UZ', 'pickupPoint.uz', 'maxlength="120"')}
-        <div class="f-2">${sf('Часы RU', 'pickupHours.ru', 'maxlength="80"')}${sf('Часы UZ', 'pickupHours.uz', 'maxlength="80"')}</div>
+        ${sf('Часы RU', 'pickupHours.ru', 'maxlength="80"')}
+        ${sf('Часы UZ', 'pickupHours.uz', 'maxlength="80"')}
       </section>
 
-      <section class="form-sec">
-        <h2>Баннер</h2>
+      <section class="form-sec card">
+        ${secHead('image', 'Баннер')}
         ${photoTile('settings', 'banner', s.banner, { cls: 'wide', w: 560, h: 320 })}
       </section>
 
@@ -503,8 +525,8 @@
         <button class="btn-line" data-act="adm-add" ${state.addingAdmin ? 'disabled' : ''}>${state.addingAdmin ? 'Добавляем…' : 'Добавить администратора'}</button>
       </div>` : '';
     return `
-      <section class="form-sec">
-        <h2>Администраторы</h2>
+      <section class="form-sec card">
+        ${secHead('users', 'Администраторы')}
         <div class="adm-list">${rows}</div>
         ${form}
       </section>`;
@@ -595,6 +617,7 @@
         break;
       case 'tag-new': state.draft.tags = state.draft.tags.includes('new') ? [] : ['new']; state.dirty = true; render(); break;
       case 'draft-active': state.draft.active = !state.draft.active; state.dirty = true; render(); break;
+      case 'fold-colors': state.colorsOpen = !state.colorsOpen; render(); break;
       case 'add-color': state.draft.colors.push({ hex: '#c8a77c', ru: '', uz: '', photo: '' }); state.dirty = true; render(); break;
       case 'rm-color': state.draft.colors.splice(Number(d.i), 1); state.dirty = true; render(); break;
       case 'upload': pickPhoto({ scope: d.scope, path: d.path, push: !!d.push }); break;
