@@ -10,7 +10,7 @@
   const nativeBack = inTG && tg.isVersionAtLeast('6.1');
 
   // Цвета бренда для нативных элементов Telegram (шапка, фон, главная кнопка)
-  const BRAND = { bg: '#fbf6ec', button: '#b8892b', buttonText: '#ffffff' };
+  const BRAND = { bg: '#ffffff', button: '#141414', buttonText: '#ffffff' };
   const MAX_QTY = 99;
 
   // ---------- storage ----------
@@ -304,19 +304,6 @@
       <div class="grid">${list.map((p) => card(p)).join('')}</div>`;
   }
 
-  const trustRow = () => `
-    <div class="trust">
-      <div class="ic">${I.truck}<span>${t('trustDelivery')}</span></div>
-      <div class="ic">${I.shirt}<span>${t('trustFitting')}</span></div>
-      <div class="ic">${I.swap}<span>${t('trustReturn')}</span></div>
-    </div>`;
-
-  const catPhoto = (c) => (S.settings.categoryPhotos || {})[c.id] || '';
-  const catIcon = (c) =>
-    catPhoto(c) ? img(catPhoto(c), 120, 120, 'ph', '', { crop: 'faces' })
-      : c.id === 'sale' ? '<span class="cat-glyph">%</span>'
-        : `<img class="cat-logo" src="${S.logo.icon}" alt="">`;
-
   function viewHome() {
     const searching = !!state.query.trim();
     return `
@@ -328,9 +315,6 @@
       </header>
       <label class="search ic">${I.search}<input id="q" type="search" enterkeyhint="search" placeholder="${esc(t('search'))}" aria-label="${esc(t('search'))}" value="${esc(state.query)}" autocomplete="off"></label>
       <div id="promo" ${searching ? 'hidden' : ''}>
-        <nav class="circles">${S.categories
-          .map((c) => `<button class="circle cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}"><span class="circle-img">${catIcon(c)}</span><span>${L(c)}</span></button>`)
-          .join('')}</nav>
         <button class="banner" data-action="cat" data-cat="all">
           ${img(S.settings.banner, 560, 320, 'banner-img', '', { eager: true })}
           <span class="banner-text">
@@ -339,9 +323,11 @@
             <span class="banner-cta">${t('bannerCta')}</span>
           </span>
         </button>
-        ${trustRow()}
         ${rail(t('newArrivals'), S.products.filter((p) => p.tags && p.tags.includes('new')))}
       </div>
+      <nav class="cats" id="cats" ${searching ? 'hidden' : ''}>${S.categories
+        .map((c) => `<button class="cat-tab cat ${state.cat === c.id ? 'on' : ''}" data-action="cat" data-cat="${c.id}">${L(c)}</button>`)
+        .join('')}</nav>
       <div id="list">${listBlock()}</div>`;
   }
 
@@ -377,18 +363,13 @@
           <span>${money(p.price)}</span>
           ${p.oldPrice ? `<span class="pd-old"><s>${money(p.oldPrice)}</s><span class="pill sale">−${d}%</span></span>` : ''}
         </div>
-        <div class="pd-sub"><i class="dot-ok"></i>${t('inStock')}</div>
+        <div class="pd-sub"><i class="dot-ok"></i>${t('pdNote')}</div>
       </div>
 
       ${section(`${t('color')}: <b>${E(c)}</b>`, `<div class="colors">${colorOpts}</div>`)}
-      ${section(`${t('size')}${sel.size ? `: <b>${sel.size}</b>` : ''}`,
+      ${section(`${t('size')}${sel.size ? `: <b>${esc(sel.size)}</b>` : ''}`,
         `<div class="sizes" id="sizes">${p.sizes.map((s) => `<button class="sz ${s === sel.size ? 'on' : ''}" data-action="size" data-s="${esc(s)}" aria-pressed="${s === sel.size}">${esc(s)}</button>`).join('')}</div>`)}
-      ${L(p.desc) ? section(t('description'), `<p class="pd-desc">${E(p.desc)}</p>`) : ''}
-      ${section('', `
-        <div class="cell">${isq(I.truck)}<div class="cell-main"><div class="cell-title">${t('perkDelivery')}</div><div class="cell-sub">${t('perkDeliverySub').replace('{x}', money(S.settings.freeFrom))}</div></div></div>
-        <div class="cell">${isq(I.shirt)}<div class="cell-main"><div class="cell-title">${t('perkFitting')}</div><div class="cell-sub">${t('perkFittingSub')}</div></div></div>
-        <div class="cell">${isq(I.swap)}<div class="cell-main"><div class="cell-title">${t('perkReturn')}</div><div class="cell-sub">${t('perkReturnSub')}</div></div></div>`,
-        '', 'icons gap-top')}`;
+      ${L(p.desc) ? section(t('description'), `<p class="pd-desc">${E(p.desc)}</p>`) : ''}`;
   }
 
   function cartItem(it, idx) {
@@ -433,13 +414,15 @@
         ${label ? `<span class="field-label">${label}</span>` : ''}
         <input data-field="${key}" value="${esc(f[key])}" placeholder="${esc(ph)}" aria-label="${esc(label || ph)}" aria-invalid="${!!e[key]}" ${attrs}>
       </label>`;
-    const option = (action, value, current, icon, title, sub) => `
+    const option = (action, value, current, icon, title, extra = '') => `
       <button class="cell opt" data-action="${action}" data-v="${value}" aria-pressed="${value === current}">
         ${isq(icon)}
-        <span class="cell-main"><span class="cell-title">${title}</span><span class="cell-sub">${sub}</span></span>
-        <span class="tick ic ${value === current ? 'on' : ''}">${I.check}</span>
+        <span class="cell-main"><span class="cell-title">${title}</span></span>
+        ${extra ? `<span class="opt-extra">${extra}</span>` : ''}
+        <span class="tick ${value === current ? 'on' : ''}"></span>
       </button>`;
     const fee = cartSum() >= S.settings.freeFrom ? t('free') : money(S.settings.deliveryFee);
+    const pickupInfo = [E(S.settings.pickupPoint), E(S.settings.pickupHours)].filter(Boolean).join(', ');
 
     return `
       ${pageHead(t('checkoutTitle'))}
@@ -448,16 +431,15 @@
         input('phone', t('phone'), '+998 90 123 45 67', 'type="tel" inputmode="tel" autocomplete="tel"'))}
 
       ${section(t('receive'),
-        option('method', 'delivery', f.method, I.truck, `${t('delivery')} · ${fee}`, t('deliverySub')) +
-        option('method', 'pickup', f.method, I.store, `${t('pickup')} · ${t('free')}`, [E(S.settings.pickupPoint), E(S.settings.pickupHours)].filter(Boolean).join(', ')),
-        '', 'icons')}
+        option('method', 'delivery', f.method, I.truck, t('delivery'), fee) +
+        option('method', 'pickup', f.method, I.store, t('pickup'), t('free')),
+        f.method === 'pickup' ? pickupInfo : '')}
 
       ${f.method === 'delivery' ? section(t('address'), input('address', '', t('addressPh'), 'autocomplete="street-address" maxlength="200"')) : ''}
 
       ${section(t('payment'),
-        option('pay', 'cash', f.pay, I.cash, t('pay_cash'), t('pay_cashSub')) +
-        option('pay', 'card', f.pay, I.card, t('pay_card'), t('pay_cardSub')),
-        t('payHint'), 'icons')}
+        option('pay', 'cash', f.pay, I.cash, t('pay_cash')) +
+        option('pay', 'card', f.pay, I.card, t('pay_card')))}
 
       ${section(t('comment'), `<label class="cell field"><textarea data-field="comment" rows="2" maxlength="500" placeholder="${esc(t('commentPh'))}" aria-label="${esc(t('comment'))}">${esc(f.comment)}</textarea></label>`)}
 
@@ -647,15 +629,18 @@
     });
   }
 
-  function setCat(id) {
+  function setCat(id, fromBanner) {
     state.query = '';
     state.cat = id;
     haptic('select');
     if (state.view !== 'home') { go('home'); return; }
     document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c.dataset.cat === id));
-    document.getElementById('list').innerHTML = listBlock();
-    const head = document.querySelector('#list .list-head');
-    if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const list = document.getElementById('list');
+    list.innerHTML = listBlock();
+    // вкладки прилипают сверху: если прокрутили ниже них (или нажали баннер) — показываем начало списка
+    const cats = document.getElementById('cats');
+    const top = list.offsetTop - (cats ? cats.offsetHeight : 0);
+    if (window.scrollY > top || fromBanner) window.scrollTo({ top, behavior: 'smooth' });
   }
 
   function selectColor(i) {
@@ -756,7 +741,7 @@
         go('product', { id: d.id, color: d.color != null ? +d.color : undefined, size: d.size });
         break;
       case 'fav': toggleFav(d.id); break;
-      case 'cat': setCat(d.cat); break;
+      case 'cat': setCat(d.cat, el.classList.contains('banner')); break;
       case 'tab': if (state.view !== d.tab) { haptic('select'); go(d.tab); } break;
       case 'back': navBack(); break;
       case 'lang': state.lang = d.v; ls.set('lang', d.v); haptic('select'); render(); break;
@@ -792,6 +777,7 @@
     if (el.id === 'q') {
       state.query = el.value;
       document.getElementById('promo').hidden = !!el.value.trim();
+      document.getElementById('cats').hidden = !!el.value.trim();
       document.getElementById('list').innerHTML = listBlock();
       return;
     }

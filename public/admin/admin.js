@@ -8,8 +8,8 @@
     tg.ready();
     tg.expand();
     try {
-      if (tg.isVersionAtLeast('6.1')) tg.setBackgroundColor('#fbf6ec');
-      if (tg.isVersionAtLeast('6.9')) tg.setHeaderColor('#fbf6ec');
+      if (tg.isVersionAtLeast('6.1')) tg.setBackgroundColor('#ffffff');
+      if (tg.isVersionAtLeast('6.9')) tg.setHeaderColor('#ffffff');
     } catch (e) { /* старый клиент */ }
   }
 
@@ -34,8 +34,7 @@
 
   const CATS = { women: 'Женщинам', men: 'Мужчинам', kids: 'Детям' };
   const STATUS = { new: 'Новый', confirmed: 'Подтверждён', delivered: 'Выполнен', cancelled: 'Отменён' };
-  const FILTERS = [['new', 'Новые'], ['confirmed', 'Подтверждённые'], ['delivered', 'Выполненные'], ['cancelled', 'Отменённые'], ['all', 'Все']];
-  const SIZE_PRESETS = [['Взрослые', 'S, M, L, XL'], ['Обувь', '38, 39, 40, 41, 42, 43'], ['Дети', '98, 110, 122, 134'], ['Один размер', 'One Size']];
+  const FILTERS = [['new', 'Новые'], ['confirmed', 'В работе'], ['delivered', 'Выполнены'], ['cancelled', 'Отменены'], ['all', 'Все']];
 
   const fmtTime = (s) => new Date(String(s).replace(' ', 'T') + 'Z').toLocaleString('ru-RU', {
     timeZone: 'Asia/Tashkent', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -150,12 +149,23 @@
       .join('');
   }
 
+  // анимация появления — только когда сменился экран, а не при каждой перерисовке
+  let lastView = '', enterTimer;
   function render() {
     if (blocked) return;
     renderNav();
     if (state.tab === 'orders') $app.innerHTML = viewOrders();
     else if (state.tab === 'products') $app.innerHTML = state.draft ? viewEditor() : viewProducts();
     else $app.innerHTML = viewSettings();
+    const view = [state.tab, state.filter, state.ordersLoaded, state.productsLoaded, !!state.draft, !!state.settingsDraft].join();
+    if (view !== lastView) {
+      lastView = view;
+      $app.classList.remove('enter');
+      void $app.offsetWidth;
+      $app.classList.add('enter');
+      clearTimeout(enterTimer);
+      enterTimer = setTimeout(() => $app.classList.remove('enter'), 700);
+    }
   }
 
   let blocked = false;
@@ -195,10 +205,10 @@
   }
 
   function orderActions(o) {
-    const b = (status, label, cls = '') => `<button class="btn-ghost ${cls}" data-act="status" data-id="${o.id}" data-v="${status}">${label}</button>`;
-    if (o.status === 'new') return b('confirmed', 'Подтвердить', 'ok') + b('cancelled', 'Отменить', 'danger');
-    if (o.status === 'confirmed') return b('delivered', 'Выполнен', 'ok') + b('cancelled', 'Отменить', 'danger');
-    return b('new', 'Вернуть в новые');
+    const b = (status, label, cls) => `<button class="${cls}" data-act="status" data-id="${o.id}" data-v="${status}">${label}</button>`;
+    if (o.status === 'new') return b('cancelled', 'Отменить', 'btn-line') + b('confirmed', 'Подтвердить', 'btn-main');
+    if (o.status === 'confirmed') return b('cancelled', 'Отменить', 'btn-line') + b('delivered', 'Выполнен', 'btn-main');
+    return b('new', 'Вернуть в новые', 'btn-line');
   }
 
   function orderCard(o) {
@@ -224,25 +234,17 @@
   function viewOrders() {
     const chips = FILTERS.map(([id, label]) => {
       const n = id === 'all' ? Object.values(state.counts).reduce((a, b) => a + b, 0) : state.counts[id] || 0;
-      return `<button class="${state.filter === id ? 'on' : ''}" data-act="filter" data-v="${id}">${label}<b>${n}</b></button>`;
+      return `<button class="${state.filter === id ? 'on' : ''}" data-act="filter" data-v="${id}">${label}${n ? `<b>${n}</b>` : ''}</button>`;
     }).join('');
     const list = !state.ordersLoaded
       ? '<div class="adm-empty">Загружаем…</div>'
       : state.orders.length
         ? state.orders.map(orderCard).join('')
         : `<div class="adm-empty">${state.filter === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</div>`;
-    const c = state.counts;
-    const stats = `
-      <div class="stats">
-        <div class="stat accent"><b>${c.new || 0}</b><span>новых</span></div>
-        <div class="stat"><b>${c.confirmed || 0}</b><span>в работе</span></div>
-        <div class="stat"><b>${c.delivered || 0}</b><span>выполнено</span></div>
-      </div>`;
     return `
-      <div class="adm-title"><h1>Заказы</h1><button class="btn-ghost" data-act="refresh">Обновить</button></div>
-      ${stats}
-      <div class="chips">${chips}</div>
-      ${list}`;
+      <div class="adm-title"><h1>Заказы</h1></div>
+      <div class="seg">${chips}</div>
+      <div class="o-list">${list}</div>`;
   }
 
   // ---------- товары ----------
@@ -259,24 +261,22 @@
   function viewProducts() {
     const q = state.query.trim().toLowerCase();
     const list = state.products.filter((p) => !q || `${p.name.ru} ${p.name.uz}`.toLowerCase().includes(q));
-    const rows = list.map((p) => {
-      const idx = state.products.indexOf(p);
-      return `
-        <div class="p-row ${p.active ? '' : 'p-off'}">
-          <button class="p-thumb" data-act="edit" data-id="${p.id}">${pic(p.colors[0] && p.colors[0].photo, 48, 60)}</button>
-          <button class="p-main" data-act="edit" data-id="${p.id}">
+    const rows = list.map((p) => `
+        <button class="p-row ${p.active ? '' : 'p-off'}" data-act="edit" data-id="${p.id}">
+          <span class="p-thumb">${pic(p.colors[0] && p.colors[0].photo, 48, 60)}</span>
+          <span class="p-main">
             <b>${esc(p.name.ru)}</b>
+            <small>${CATS[p.cat] || ''}</small>
+          </span>
+          <span class="p-side">
             <span class="p-price">${money(p.price)}</span>
-            <small>${CATS[p.cat] || ''}${p.oldPrice ? ' · скидка' : ''}${p.tags.includes('new') ? ' · новинка' : ''}${p.active ? '' : ' · скрыт'}</small>
-          </button>
-          ${q ? '' : `<div class="p-move"><button data-act="move" data-id="${p.id}" data-v="-1" ${idx === 0 ? 'disabled' : ''} aria-label="Выше">▲</button><button data-act="move" data-id="${p.id}" data-v="1" ${idx === state.products.length - 1 ? 'disabled' : ''} aria-label="Ниже">▼</button></div>`}
-          <button class="switch ${p.active ? 'on' : ''}" data-act="toggle" data-id="${p.id}" aria-label="Показывать в магазине" aria-pressed="${p.active}"></button>
-        </div>`;
-    }).join('');
+            ${p.active ? '' : '<span class="tag">Скрыт</span>'}
+          </span>
+        </button>`).join('');
     return `
-      <div class="adm-title"><h1>Товары</h1><button class="btn-sm" data-act="new">+ Добавить</button></div>
-      <div class="search-row"><label class="search ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="pq" type="search" placeholder="Поиск товара" value="${esc(state.query)}" autocomplete="off"></label></div>
-      ${!state.productsLoaded ? '<div class="adm-empty">Загружаем…</div>' : list.length ? `<div class="sec">${rows}</div><p class="hint">Переключатель справа — показывать товар в магазине. Стрелки меняют порядок в каталоге.</p>` : '<div class="adm-empty">Товаров не найдено</div>'}`;
+      <div class="adm-title"><h1>Товары</h1><button class="btn-sm" data-act="new">Добавить</button></div>
+      <label class="search ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="pq" type="search" placeholder="Поиск" value="${esc(state.query)}" autocomplete="off"></label>
+      ${!state.productsLoaded ? '<div class="adm-empty">Загружаем…</div>' : list.length ? `<div class="p-list">${rows}</div>` : '<div class="adm-empty">Ничего не найдено</div>'}`;
   }
 
   const blankProduct = () => ({
@@ -323,13 +323,12 @@
     const d = state.draft;
     const colorRows = d.colors.map((c, i) => `
       <div class="color-row">
-        <div>${photoTile('draft', `colors.${i}.photo`, c.photo)}<span class="tile-cap">${i === 0 ? 'главное фото' : 'фото цвета'}</span></div>
-        <div>
-          <div class="f-2">${field('Цвет (RU)', `colors.${i}.ru`, 'maxlength="40" placeholder="Чёрный"')}${field('Цвет (UZ)', `colors.${i}.uz`, 'maxlength="40" placeholder="Qora"')}</div>
-          <div class="color-tools" style="margin-top:8px">
+        ${photoTile('draft', `colors.${i}.photo`, c.photo)}
+        <div class="color-fields">
+          <div class="f-2">${field('Цвет RU', `colors.${i}.ru`, 'maxlength="40" placeholder="Чёрный"')}${field('Цвет UZ', `colors.${i}.uz`, 'maxlength="40" placeholder="Qora"')}</div>
+          <div class="color-tools">
             <input type="color" data-bind="colors.${i}.hex" value="${esc(c.hex)}" aria-label="Оттенок цвета">
-            <span class="muted" style="font-size:12px">оттенок кружка в карточке</span>
-            ${d.colors.length > 1 ? `<button class="btn-ghost danger" style="margin-left:auto" data-act="rm-color" data-i="${i}">Убрать</button>` : ''}
+            ${d.colors.length > 1 ? `<button class="link danger" data-act="rm-color" data-i="${i}">Убрать</button>` : ''}
           </div>
         </div>
       </div>`).join('');
@@ -337,53 +336,47 @@
     const extra = d.photos.map((src, i) => photoTile('draft', `photos.${i}`, src, { removable: true })).join('');
     const addingExtra = state.uploading['draft:photos'];
     return `
-      <div class="adm-title"><button class="link" data-act="close">‹ Товары</button><span class="muted">${state.draftId ? 'Редактирование' : 'Новый товар'}</span></div>
+      <div class="adm-title sub"><button class="back" data-act="close" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>${state.draftId ? 'Товар' : 'Новый товар'}</h1></div>
 
       <section class="form-sec">
-        <h2>Название и цена</h2>
-        ${field('Название (RU)', 'name.ru', 'maxlength="120" placeholder="Платье макси"')}
-        ${field('Название (UZ)', 'name.uz', 'maxlength="120" placeholder="Maksi ko‘ylak"')}
+        <h2>Основное</h2>
+        ${field('Название RU', 'name.ru', 'maxlength="120" placeholder="Платье макси"')}
+        ${field('Название UZ', 'name.uz', 'maxlength="120" placeholder="Maksi ko‘ylak"')}
+        <label class="f"><span>Категория</span><select data-bind="cat">${Object.entries(CATS).map(([v, l]) => `<option value="${v}" ${d.cat === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="f-2">
-          <label class="f"><span>Категория</span><select data-bind="cat">${Object.entries(CATS).map(([v, l]) => `<option value="${v}" ${d.cat === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           ${field('Цена, сум', 'price', 'inputmode="numeric" placeholder="459000"')}
+          ${field('Старая цена', 'oldPrice', 'inputmode="numeric" placeholder="—"')}
         </div>
-        <div class="f-2">
-          ${field('Старая цена (для скидки)', 'oldPrice', 'inputmode="numeric" placeholder="необязательно"')}
-          <div></div>
-        </div>
-        <div class="check"><span>Метка «Новинка»</span><button class="switch ${d.tags.includes('new') ? 'on' : ''}" data-act="tag-new" aria-pressed="${d.tags.includes('new')}"></button></div>
-        <div class="check"><span>Показывать в магазине</span><button class="switch ${d.active ? 'on' : ''}" data-act="draft-active" aria-pressed="${d.active}"></button></div>
+        <div class="check"><span>Новинка</span><button class="switch ${d.tags.includes('new') ? 'on' : ''}" data-act="tag-new" aria-label="Новинка" aria-pressed="${d.tags.includes('new')}"></button></div>
+        <div class="check"><span>Показывать в магазине</span><button class="switch ${d.active ? 'on' : ''}" data-act="draft-active" aria-label="Показывать в магазине" aria-pressed="${d.active}"></button></div>
       </section>
 
       <section class="form-sec">
-        <h2>Цвета и фото</h2>
+        <h2>Цвета</h2>
         ${colorRows}
-        <button class="btn-ghost" data-act="add-color">+ Добавить цвет</button>
-        <p class="hint">У каждого цвета своё фото — оно показывается при выборе цвета. Лучше вертикальные фото 4:5.</p>
+        <button class="link" data-act="add-color">Добавить цвет</button>
       </section>
 
       <section class="form-sec">
-        <h2>Дополнительные фото</h2>
+        <h2>Фото</h2>
         <div class="tiles">${extra}${addingExtra ? '<div class="tile loading"></div>' : ''}<button class="tile add" data-act="upload" data-scope="draft" data-path="photos" data-push="1" aria-label="Добавить фото">+</button></div>
       </section>
 
       <section class="form-sec">
         <h2>Размеры</h2>
         <label class="f"><span>Через запятую</span><input data-bind="sizesText" value="${esc(d.sizesText)}" placeholder="S, M, L, XL"></label>
-        <div class="presets">${SIZE_PRESETS.map(([l, v]) => `<button class="btn-ghost" data-act="sizes" data-v="${v}">${l}</button>`).join('')}</div>
       </section>
 
       <section class="form-sec">
         <h2>Описание</h2>
-        ${area('Описание (RU)', 'desc.ru')}
-        ${area('Описание (UZ)', 'desc.uz')}
+        ${area('RU', 'desc.ru')}
+        ${area('UZ', 'desc.uz')}
       </section>
 
-      ${state.draftId ? '<button class="btn-ghost danger" style="width:100%;height:44px" data-act="delete">Удалить товар</button>' : ''}
+      ${state.draftId ? '<button class="link danger del" data-act="delete">Удалить товар</button>' : ''}
 
       <div class="save-bar"><div>
-        <button class="btn-ghost" data-act="close">Отмена</button>
-        <button class="btn-sm" data-act="save" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button>
+        <button class="btn-main" data-act="save" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button>
       </div></div>`;
   }
 
@@ -418,20 +411,6 @@
     }
   }
 
-  async function moveProduct(id, dir) {
-    const i = state.products.findIndex((p) => p.id === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= state.products.length) return;
-    [state.products[i], state.products[j]] = [state.products[j], state.products[i]];
-    render();
-    try {
-      await api('/products/order', { method: 'POST', body: { ids: state.products.map((p) => p.id) } });
-    } catch (e) {
-      toast(e.message, true);
-      loadProducts();
-    }
-  }
-
   // ---------- настройки ----------
   async function loadSettings() {
     try {
@@ -451,7 +430,6 @@
     if (!s) return '<div class="adm-empty">Загружаем…</div>';
     const sf = (label, path, attrs = '') =>
       `<label class="f"><span>${label}</span><input data-sbind="${path}" value="${esc(getAt(s, path) ?? '')}" ${attrs}></label>`;
-    const tgOn = state.me && state.me.telegram;
     return `
       <div class="adm-title"><h1>Настройки</h1></div>
 
@@ -462,71 +440,54 @@
 
       <section class="form-sec">
         <h2>Самовывоз</h2>
-        ${sf('Адрес (RU)', 'pickupPoint.ru', 'maxlength="120"')}
-        ${sf('Адрес (UZ)', 'pickupPoint.uz', 'maxlength="120"')}
-        <div class="f-2">${sf('Часы (RU)', 'pickupHours.ru', 'maxlength="80"')}${sf('Часы (UZ)', 'pickupHours.uz', 'maxlength="80"')}</div>
+        ${sf('Адрес RU', 'pickupPoint.ru', 'maxlength="120"')}
+        ${sf('Адрес UZ', 'pickupPoint.uz', 'maxlength="120"')}
+        <div class="f-2">${sf('Часы RU', 'pickupHours.ru', 'maxlength="80"')}${sf('Часы UZ', 'pickupHours.uz', 'maxlength="80"')}</div>
       </section>
 
       <section class="form-sec">
-        <h2>Баннер на главной</h2>
+        <h2>Баннер</h2>
         ${photoTile('settings', 'banner', s.banner, { cls: 'wide', w: 560, h: 320 })}
-        <p class="hint">Горизонтальное фото. Нажмите, чтобы заменить.</p>
       </section>
 
-      <section class="form-sec">
-        <h2>Фото категорий</h2>
-        <div class="tiles">${Object.entries(CATS).map(([id, label]) => `<div>${photoTile('settings', `categoryPhotos.${id}`, s.categoryPhotos[id], { cls: 'round', w: 72, h: 72 })}<span class="tile-cap">${label}</span></div>`).join('')}</div>
-      </section>
+      <div class="save-inline"><button class="btn-main" data-act="save-settings" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button></div>
 
-      ${viewAdmins()}
-
-      <section class="form-sec">
-        <h2>Уведомления о заказах</h2>
-        <div class="tg-status ${tgOn ? 'on' : ''}"><i></i><span>${tgOn ? (state.me.notifyTo === 'group' ? 'Новые заказы приходят в группу менеджеров в Telegram.' : 'Новые заказы приходят в Telegram администраторам, у которых включён переключатель «заказы».') : 'Уведомления выключены у всех администраторов.'}</span></div>
-      </section>
-
-      <div class="save-bar"><div>
-        <button class="btn-sm" data-act="save-settings" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить настройки'}</button>
-      </div></div>`;
+      ${viewAdmins()}`;
   }
 
   // ---------- администраторы ----------
   function viewAdmins() {
     const me = state.me || {};
     const isOwner = me.role === 'owner';
-    const link = me.bot ? `t.me/${me.bot}/admin` : '';
+    const bell = '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 004 0"/></svg>';
     const rows = (state.admins || []).map((a) => {
       const self = a.tg_id === String(me.id);
-      const title = a.name || a.username ? `${esc(a.name)}${a.username ? ` <span class="muted">@${esc(a.username)}</span>` : ''}` : '<span class="muted">ещё не заходил</span>';
+      const title = a.name || (a.username ? '@' + a.username : 'ID ' + a.tg_id);
       const canToggle = isOwner || self;
       const canRemove = isOwner && a.role !== 'owner';
       return `
         <div class="adm-row">
           <div class="adm-main">
-            <b>${title}</b>
-            <small>ID ${esc(a.tg_id)} · ${a.role === 'owner' ? 'владелец' : 'администратор'}${self ? ' · это вы' : ''}</small>
+            <b>${esc(title)}</b>
+            <small>${a.role === 'owner' ? 'Владелец' : 'Администратор'}${self ? ' · вы' : ''}</small>
           </div>
-          <div class="adm-side">
-            <span class="muted">заказы</span>
-            <button class="switch ${a.notify ? 'on' : ''}" data-act="adm-notify" data-id="${esc(a.tg_id)}" aria-label="Получать заказы в Telegram" aria-pressed="${a.notify}" ${canToggle ? '' : 'disabled'}></button>
-            ${canRemove ? `<button class="btn-ghost danger" data-act="adm-rm" data-id="${esc(a.tg_id)}">Убрать</button>` : ''}
-          </div>
+          <button class="icon-btn ${a.notify ? 'on' : ''}" data-act="adm-notify" data-id="${esc(a.tg_id)}" aria-label="Заказы в Telegram" title="Заказы в Telegram" aria-pressed="${a.notify}" ${canToggle ? '' : 'disabled'}>${bell}</button>
+          ${canRemove ? `<button class="icon-btn" data-act="adm-rm" data-id="${esc(a.tg_id)}" aria-label="Убрать" title="Убрать"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ''}
         </div>`;
     }).join('');
     const nd = state.newAdmin;
     const form = isOwner ? `
       <div class="adm-add">
         <div class="f-2">
-          <label class="f"><span>Telegram ID</span><input data-abind="tgId" value="${esc(nd.tgId)}" inputmode="numeric" placeholder="например 7567850330"></label>
-          <label class="f"><span>Имя (для себя)</span><input data-abind="name" value="${esc(nd.name)}" maxlength="60" placeholder="Менеджер Дилноза"></label>
+          <label class="f"><span>Telegram ID</span><input data-abind="tgId" value="${esc(nd.tgId)}" inputmode="numeric" placeholder="7567850330"></label>
+          <label class="f"><span>Имя</span><input data-abind="name" value="${esc(nd.name)}" maxlength="60" placeholder="Дилноза"></label>
         </div>
-        <button class="btn-sm" data-act="adm-add" ${state.addingAdmin ? 'disabled' : ''}>${state.addingAdmin ? 'Добавляем…' : '+ Добавить администратора'}</button>
-        <p class="hint">Как узнать Telegram ID: пусть человек откроет админку${link ? ` по ссылке <b>${esc(link)}</b>` : ' из бота'} — на экране «Нет доступа» будет его ID. После добавления бот пришлёт ему кнопку для входа (если он хоть раз нажимал «Start» в боте).</p>
-      </div>` : '<p class="hint">Добавлять и убирать администраторов может только владелец.</p>';
+        <button class="btn-line" data-act="adm-add" ${state.addingAdmin ? 'disabled' : ''}>${state.addingAdmin ? 'Добавляем…' : 'Добавить администратора'}</button>
+      </div>` : '';
     return `
       <section class="form-sec">
         <h2>Администраторы</h2>
-        <div class="adm-list">${rows || '<p class="muted">Пока никого</p>'}</div>
+        <div class="adm-list">${rows}</div>
         ${form}
       </section>`;
   }
@@ -589,7 +550,6 @@
         if (d.v === 'settings') loadSettings();
         break;
       case 'filter': state.filter = d.v; state.ordersLoaded = false; render(); loadOrders(); break;
-      case 'refresh': loadOrders(); break;
       case 'status':
         try {
           await api('/orders/' + d.id, { method: 'PATCH', body: { status: d.v } });
@@ -602,7 +562,7 @@
       case 'close': closeEditor(false); break;
       case 'save': saveProduct(); break;
       case 'delete':
-        if (!(await ask('Удалить товар безвозвратно? Можно вместо этого просто скрыть его переключателем.'))) return;
+        if (!(await ask('Удалить товар безвозвратно? Можно вместо этого скрыть его из магазина.'))) return;
         try {
           await api('/products/' + state.draftId, { method: 'DELETE' });
           toast('Товар удалён');
@@ -610,22 +570,10 @@
           loadProducts();
         } catch (e) { toast(e.message, true); }
         break;
-      case 'toggle': {
-        const p = state.products.find((x) => x.id === d.id);
-        p.active = !p.active;
-        render();
-        try {
-          await api('/products/' + p.id, { method: 'PATCH', body: { active: p.active } });
-          toast(p.active ? 'Товар показан в магазине' : 'Товар скрыт из магазина');
-        } catch (e) { p.active = !p.active; render(); toast(e.message, true); }
-        break;
-      }
-      case 'move': moveProduct(d.id, Number(d.v)); break;
       case 'tag-new': state.draft.tags = state.draft.tags.includes('new') ? [] : ['new']; state.dirty = true; render(); break;
       case 'draft-active': state.draft.active = !state.draft.active; state.dirty = true; render(); break;
       case 'add-color': state.draft.colors.push({ hex: '#c8a77c', ru: '', uz: '', photo: '' }); state.dirty = true; render(); break;
       case 'rm-color': state.draft.colors.splice(Number(d.i), 1); state.dirty = true; render(); break;
-      case 'sizes': state.draft.sizesText = d.v; state.dirty = true; render(); break;
       case 'upload': pickPhoto({ scope: d.scope, path: d.path, push: !!d.push }); break;
       case 'rm-photo': {
         const parts = d.path.split('.');
