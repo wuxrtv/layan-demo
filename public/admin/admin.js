@@ -209,7 +209,7 @@
         : `<span class="muted">Telegram: ${esc(o.tg_user.first_name || o.tg_user.id)}</span>`
       : '';
     return `
-      <article class="o-card ${o.status === 'new' ? 'is-new' : ''}">
+      <article class="o-card" data-st="${o.status}">
         <div class="o-top"><b>#${o.no}</b><span class="st st-${o.status}">${STATUS[o.status] || o.status}</span><span class="o-time">${fmtTime(o.created_at)}</span></div>
         <div class="o-total">${money(o.total)}</div>
         <div class="o-row"><span>${esc(o.name)}</span><a href="tel:${esc(tel)}">${esc(o.phone)}</a>${tg}</div>
@@ -231,8 +231,16 @@
       : state.orders.length
         ? state.orders.map(orderCard).join('')
         : `<div class="adm-empty">${state.filter === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</div>`;
+    const c = state.counts;
+    const stats = `
+      <div class="stats">
+        <div class="stat accent"><b>${c.new || 0}</b><span>новых</span></div>
+        <div class="stat"><b>${c.confirmed || 0}</b><span>в работе</span></div>
+        <div class="stat"><b>${c.delivered || 0}</b><span>выполнено</span></div>
+      </div>`;
     return `
       <div class="adm-title"><h1>Заказы</h1><button class="btn-ghost" data-act="refresh">Обновить</button></div>
+      ${stats}
       <div class="chips">${chips}</div>
       ${list}`;
   }

@@ -254,8 +254,8 @@
           ${favBtn(p)}
         </div>
         <div class="card-body">
-          <div class="price">${money(p.price)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
           <div class="name">${E(p.name)}</div>
+          <div class="price">${money(p.price)}${p.oldPrice ? `<s>${money(p.oldPrice)}</s>` : ''}</div>
           ${p.colors.length > 1 ? `<div class="dots">${p.colors.map((c) => `<i style="background:${c.hex}"></i>`).join('')}</div>` : ''}
         </div>
       </article>`;
