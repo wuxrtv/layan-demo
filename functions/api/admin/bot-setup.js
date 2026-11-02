@@ -1,11 +1,12 @@
-// Настройка бота через сервер (токен из секрета TG_BOT_TOKEN, наружу не выдаётся).
-// GET  /api/bot-setup — проверить токен: какой бот и какая кнопка меню стоит сейчас
-// POST /api/bot-setup — поставить кнопку меню «Магазин» со ссылкой на сайт и прислать владельцам
+// Настройка бота через сервер (токен из секрета TG_BOT_TOKEN, наружу не выдаётся). Только для владельцев.
+// GET  /api/admin/bot-setup — проверить токен: какой бот и какая кнопка меню стоит сейчас
+// POST /api/admin/bot-setup — поставить кнопку меню «Магазин» со ссылкой на сайт и прислать владельцам
 //                       сообщение с кнопкой «Открыть админку» (не чаще раза в 2 минуты)
-import { json, fail, handle } from '../../lib/http.js';
-import { botToken, ownerIds, sendMessage, tgApi } from '../../lib/telegram.js';
+import { json, fail, handle } from '../../../lib/http.js';
+import { botToken, ownerIds, sendMessage, tgApi } from '../../../lib/telegram.js';
 
-export const onRequestGet = handle(async ({ env }) => {
+export const onRequestGet = handle(async ({ env, data }) => {
+  if (data.admin.role !== 'owner') return fail('Только для владельца', 403);
   if (!botToken(env)) return fail('TG_BOT_TOKEN не задан', 503);
   const me = await tgApi(env, 'getMe');
   if (!me.ok) return json({ ok: false, error: 'Telegram не принял токен: ' + (me.description || 'неизвестная ошибка') }, { status: 502 });
@@ -13,7 +14,8 @@ export const onRequestGet = handle(async ({ env }) => {
   return json({ ok: true, bot: me.result.username, owners: ownerIds(env).length, menuButton: menu.ok ? menu.result : null });
 });
 
-export const onRequestPost = handle(async ({ request, env }) => {
+export const onRequestPost = handle(async ({ request, env, data }) => {
+  if (data.admin.role !== 'owner') return fail('Только для владельца', 403);
   if (!botToken(env)) return fail('TG_BOT_TOKEN не задан', 503);
 
   // защита от частых вызовов: сообщения владельцам не чаще раза в 2 минуты

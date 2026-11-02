@@ -20,7 +20,8 @@ export const onRequestDelete = handle(async ({ env, params, data }) => {
   const id = String(params.id);
   if (data.admin.role !== 'owner') return fail('Убирать администраторов может только владелец', 403);
   if (ownerIds(env).includes(id)) return fail('Владельца нельзя убрать из админки');
-  const r = await env.DB.prepare("DELETE FROM admins WHERE tg_id = ?1 AND role = 'admin'").bind(id).run();
+  // без условия на role: бывший владелец (убранный из ADMIN_TG_IDS) в таблице ещё может значиться как owner
+  const r = await env.DB.prepare('DELETE FROM admins WHERE tg_id = ?1').bind(id).run();
   if (!r.meta.changes) return fail('Администратор не найден', 404);
   return json({ ok: true });
 });

@@ -58,6 +58,7 @@ body.has-tabbar.has-main #app { padding-bottom: calc(var(--tabbar-h) + 96px + va
   animation: shimmer 1.3s linear infinite;
 }
 .ph.ld { background: none; animation: img-in .5s var(--ease); }
+img.instant { animation: none !important; } /* уже было в кэше — без повторного появления */
 
 /* ---------- секции ---------- */
 .sec { overflow: hidden; border-radius: var(--r); background: var(--section); border: 1px solid var(--sep); }
@@ -147,13 +148,15 @@ em.ok { color: var(--ok); }
 /* ---------- сетка товаров ---------- */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 10px; }
 .page-head + .grid { margin-top: 12px; }
-.card { position: relative; animation: card-in .5s var(--ease) both; }
-.grid .card:nth-child(2) { animation-delay: .04s; }
-.grid .card:nth-child(3) { animation-delay: .08s; }
-.grid .card:nth-child(4) { animation-delay: .12s; }
-.grid .card:nth-child(5) { animation-delay: .16s; }
-.grid .card:nth-child(6) { animation-delay: .2s; }
-.grid .card:nth-child(n+7) { animation-delay: .24s; }
+.card { position: relative; }
+/* карточки появляются при переходе на экран и при смене категории (#list.enter), но не при перерисовке */
+:is(#app.enter, #list.enter) .card { animation: card-in .5s var(--ease) both; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(2) { animation-delay: .04s; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(3) { animation-delay: .08s; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(4) { animation-delay: .12s; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(5) { animation-delay: .16s; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(6) { animation-delay: .2s; }
+:is(#app.enter, #list.enter) .grid .card:nth-child(n+7) { animation-delay: .24s; }
 .card-open { position: absolute; inset: 0; z-index: 1; border-radius: 8px; }
 .card-open:active { transform: none; }
 .card .fav { z-index: 2; }
@@ -188,7 +191,8 @@ em.ok { color: var(--ok); }
 .float-btn.fav { right: 12px; }
 .float-btn.fav svg { width: 19px; height: 19px; }
 
-.pd-info { padding: 18px 2px 2px; border: 0; border-radius: 0; background: none; animation: rise .45s var(--ease) .05s both; }
+.pd-info { padding: 18px 2px 2px; border: 0; border-radius: 0; background: none; }
+#app.enter .pd-info { animation: rise .45s var(--ease) .05s both; }
 .pd-name { margin: 0; font-size: 19px; font-weight: 500; line-height: 1.3; }
 .pd-price { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 4px; margin-top: 8px; font-size: 19px; font-weight: 600; }
 .pd-old { display: inline-flex; align-items: center; gap: 8px; }
@@ -217,7 +221,8 @@ em.ok { color: var(--ok); }
 
 /* ---------- корзина ---------- */
 .page-head + .sec { margin-top: 12px; }
-.ci { align-items: flex-start; padding-top: 14px; padding-bottom: 14px; animation: rise .4s var(--ease) both; }
+.ci { align-items: flex-start; padding-top: 14px; padding-bottom: 14px; }
+#app.enter .ci { animation: rise .4s var(--ease) both; }
 .ci-img { flex: none; width: 66px; height: 84px; overflow: hidden; border-radius: 6px; background: var(--surface-2); }
 .ci-name { font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ci-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; margin-top: 10px; }
@@ -334,7 +339,7 @@ body.has-tabbar.has-main #toast { bottom: calc(var(--tabbar-h) + 82px + var(--sa
 
 /* «уменьшить движение»: убираем сдвиги и масштаб, оставляем мягкие появления */
 @media (prefers-reduced-motion: reduce) {
-  #app.enter, .card, .ci, .pd-info, .empty, .success h1, .success p { animation-name: fade-in; }
+  #app.enter, :is(#app.enter, #list.enter) .card, #app.enter .ci, #app.enter .pd-info, .empty, .success h1, .success p { animation-name: fade-in; }
   .banner-img, .gal .ph.ld { animation: none; }
   button:active:not(:disabled) { transform: none; }
 }

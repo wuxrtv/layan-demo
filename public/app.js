@@ -86,7 +86,8 @@
     } else {
       d = v.replace(/\D/g, '');
     }
-    if (d.length > 9 && d.startsWith('998')) d = d.slice(3); // вставили полный номер с кодом страны
+    // вставили полный номер с кодом страны (998 + 9 цифр); номер вида 99 812… не трогаем
+    if (d.length >= 12 && d.startsWith('998')) d = d.slice(3);
     return d.slice(0, 9);
   }
 
@@ -124,7 +125,8 @@
 
   // Фото выбранного цвета идёт первым, затем общие фото товара
   function gallery(p, ci) {
-    const main = (p.colors[ci] || p.colors[0]).photo;
+    // у цвета может не быть своего фото — тогда показываем главное фото товара
+    const main = (p.colors[ci] && p.colors[ci].photo) || p.colors[0].photo;
     return [...new Set([main, ...(p.photos || [])].filter(Boolean))];
   }
 
@@ -512,16 +514,27 @@
     }
     $app.dataset.view = state.view;
     $app.innerHTML = VIEWS[state.view]();
+    markCachedImages($app);
     if (state.view === 'product') bindGallery();
     renderTabbar();
     syncMain();
     syncBack();
   }
 
+  // Появление экрана — только при переходе; класс снимаем, чтобы выбор размера, +/− в корзине
+  // и другие перерисовки того же экрана не проигрывали анимацию заново
+  let enterTimer;
   function animateEnter() {
     $app.classList.remove('enter');
     void $app.offsetWidth;
     $app.classList.add('enter');
+    clearTimeout(enterTimer);
+    enterTimer = setTimeout(() => $app.classList.remove('enter'), 800);
+  }
+
+  // Фото, которые уже в кэше, показываем сразу — без повторного плавного появления при перерисовке
+  function markCachedImages(root) {
+    for (const im of root.querySelectorAll('img')) if (im.complete && im.naturalWidth) im.classList.add('ld', 'instant');
   }
 
   // ---------- история браузера (только вне Telegram) ----------
@@ -641,6 +654,11 @@
     document.querySelectorAll('.cat').forEach((c) => c.classList.toggle('on', c.dataset.cat === id));
     const list = document.getElementById('list');
     list.innerHTML = listBlock();
+    markCachedImages(list);
+    list.classList.remove('enter');
+    void list.offsetWidth;
+    list.classList.add('enter'); // карточки новой категории появляются по очереди
+    setTimeout(() => list.classList.remove('enter'), 900);
     // вкладки прилипают сверху: если прокрутили ниже них (или нажали баннер) — показываем начало списка
     const cats = document.getElementById('cats');
     const top = list.offsetTop - (cats ? cats.offsetHeight : 0);
@@ -692,6 +710,7 @@
         body: JSON.stringify({
           name: f.name, phone: f.phone, method: f.method, address: f.address, pay: f.pay, comment: f.comment, lang: state.lang,
           items: state.cart.map(({ id, color, size, qty }) => ({ id, color, size, qty })),
+          expectTotal: cartSum() + deliveryFee(),
           initData: inTG ? tg.initData : '',
         }),
       });
@@ -817,7 +836,8 @@
       const p = i && product(i.id);
       return p && p.colors[i.color] && p.sizes.includes(i.size) && Number.isInteger(i.qty) && i.qty > 0;
     }).map((i) => ({ ...i, qty: Math.min(MAX_QTY, i.qty) }));
-    state.favs = (Array.isArray(state.favs) ? state.favs : []).filter((id) => product(id));
+    // избранное не чистим по каталогу: скрытый товар вернётся в избранное, когда его снова покажут
+    state.favs = (Array.isArray(state.favs) ? state.favs : []).filter((id) => typeof id === 'string').slice(-200);
     saveCart();
     ls.set('favs', state.favs);
   }

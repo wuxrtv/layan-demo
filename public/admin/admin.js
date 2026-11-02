@@ -43,6 +43,7 @@
     doc: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     truck: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
     pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    db: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>',
     users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.6a3.5 3.5 0 010 6.8M18 14a6.5 6.5 0 013.5 6"/>',
     up: '<path d="M6 15l6-6 6 6"/>',
     down: '<path d="M7 10l5 5 5-5"/>',
@@ -168,12 +169,25 @@
       .join('');
   }
 
+  // В Telegram beforeunload не срабатывает при смахивании мини-приложения —
+  // пока в товаре есть несохранённые изменения, просим Telegram переспросить перед закрытием
+  let closingGuard = false;
+  function syncClosingGuard() {
+    const need = !!(state.draft && state.dirty);
+    if (need === closingGuard || !tg || !initData || !tg.isVersionAtLeast('6.2')) return;
+    closingGuard = need;
+    if (need) tg.enableClosingConfirmation();
+    else tg.disableClosingConfirmation();
+  }
+  const uploadsInProgress = () => Object.keys(state.uploading).length > 0;
+
   // Анимация — один раз: при смене экрана появляется весь экран (enter),
   // при приходе новых данных (другой фильтр, загрузка) — только список (list-enter).
   // Обычные перерисовки (переключатели, ввод, автообновление) ничего не анимируют.
   let lastScreen = '', lastData = '', enterTimer;
   function render() {
     if (blocked) return;
+    syncClosingGuard();
     renderNav();
     const seg = $app.querySelector('.seg');
     const segX = seg ? seg.scrollLeft : 0;
@@ -182,6 +196,8 @@
     else $app.innerHTML = viewSettings();
     const newSeg = $app.querySelector('.seg');
     if (newSeg) newSeg.scrollLeft = segX;
+    // фото из кэша — сразу, без повторного проявления при каждом нажатии
+    for (const im of $app.querySelectorAll('img')) if (im.complete && im.naturalWidth) im.classList.add('ld', 'instant');
 
     const screen = [state.tab, !!state.draft].join();
     const data = [state.ordersFor, state.productsLoaded, !!state.settingsDraft].join();
@@ -453,7 +469,8 @@
   // ---------- настройки ----------
   async function loadSettings() {
     try {
-      const [{ settings }, me, { admins }] = await Promise.all([api('/settings'), api('/me'), api('/admins')]);
+      const [{ settings }, me, { admins }, usage] = await Promise.all([api('/settings'), api('/me'), api('/admins'), api('/usage')]);
+      state.usage = usage;
       state.settings = settings;
       state.me = me;
       state.admins = admins;
@@ -471,6 +488,7 @@
       `<label class="f"><span>${label}</span><input data-sbind="${path}" value="${esc(getAt(s, path) ?? '')}" ${attrs}></label>`;
     return `
       <div class="adm-title"><h1>Настройки</h1></div>
+      ${viewUsage()}
 
       <section class="form-sec card">
         ${secHead('truck', 'Доставка')}
@@ -493,6 +511,20 @@
       <div class="save-inline"><button class="btn-main" data-act="save-settings" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button></div>
 
       ${viewAdmins()}`;
+  }
+
+  // место в базе: бесплатно 500 МБ; при 80% полоска красная, а бот присылает предупреждение
+  function viewUsage() {
+    const u = state.usage;
+    if (!u) return '';
+    const mb = (b) => { const v = b / 1048576; return v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v)); };
+    const pct = Math.min(100, (u.used / u.limit) * 100);
+    return `
+      <section class="form-sec card usage ${pct >= 80 ? 'full' : ''}">
+        ${secHead('db', 'Место', `<span class="usage-pct">${pct < 1 ? '<1' : Math.round(pct)}%</span>`)}
+        <div class="usage-bar"><i style="width:${Math.max(pct, 1.5)}%"></i></div>
+        <div class="usage-meta"><b>${mb(u.used)} МБ из ${mb(u.limit)} МБ</b><span>Товаров: ${u.products} · Фото: ${u.photos}</span></div>
+      </section>`;
   }
 
   // ---------- администраторы ----------
@@ -557,6 +589,12 @@
 
   async function saveSettings() {
     if (state.saving) return;
+    // пустое поле не должно молча превращаться в 0 (бесплатная доставка для всех) — 0 нужно вписать явно
+    const blank = (v) => String(v ?? '').trim() === '';
+    if (blank(state.settingsDraft.deliveryFee) || blank(state.settingsDraft.freeFrom)) {
+      toast('Заполните стоимость доставки и сумму бесплатной доставки (можно 0)', true);
+      return;
+    }
     state.saving = true;
     render();
     try {
@@ -605,7 +643,10 @@
       case 'new': openEditor(null); break;
       case 'edit': openEditor(d.id); break;
       case 'close': closeEditor(false); break;
-      case 'save': saveProduct(); break;
+      case 'save':
+        if (uploadsInProgress()) { toast('Дождитесь, пока загрузится фото', true); break; }
+        saveProduct();
+        break;
       case 'delete':
         if (!(await ask('Удалить товар безвозвратно? Можно вместо этого скрыть его из магазина.'))) return;
         try {
@@ -619,9 +660,14 @@
       case 'draft-active': state.draft.active = !state.draft.active; state.dirty = true; render(); break;
       case 'fold-colors': state.colorsOpen = !state.colorsOpen; render(); break;
       case 'add-color': state.draft.colors.push({ hex: '#c8a77c', ru: '', uz: '', photo: '' }); state.dirty = true; render(); break;
-      case 'rm-color': state.draft.colors.splice(Number(d.i), 1); state.dirty = true; render(); break;
+      case 'rm-color':
+        // во время загрузки номера цветов не меняем — иначе фото попадёт не в тот цвет
+        if (uploadsInProgress()) { toast('Дождитесь, пока загрузится фото', true); break; }
+        state.draft.colors.splice(Number(d.i), 1); state.dirty = true; render();
+        break;
       case 'upload': pickPhoto({ scope: d.scope, path: d.path, push: !!d.push }); break;
       case 'rm-photo': {
+        if (uploadsInProgress()) { toast('Дождитесь, пока загрузится фото', true); break; }
         const parts = d.path.split('.');
         const i = Number(parts.pop());
         getAt(state.draft, parts.join('.')).splice(i, 1);
@@ -675,6 +721,7 @@
     if (el.dataset.bind && state.draft) {
       setAt(state.draft, el.dataset.bind, el.value);
       state.dirty = true;
+      syncClosingGuard();
     }
     if (el.dataset.sbind && state.settingsDraft) setAt(state.settingsDraft, el.dataset.sbind, el.value);
     if (el.dataset.abind) state.newAdmin[el.dataset.abind] = el.value;

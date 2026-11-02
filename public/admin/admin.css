@@ -114,6 +114,9 @@ button { display: inline-flex; align-items: center; justify-content: center; gap
 
 /* формы: разделы — белые карточки с иконкой и заголовком */
 .form-sec { padding: 4px 0 22px; }
+/* класс card из styles.css анимирует карточки магазина — здесь разделы появляются только при смене экрана */
+.form-sec.card { animation: none; }
+:is(#app.enter, #app.list-enter) .form-sec.card { animation: card-in .4s var(--ease) both; }
 .form-sec.card { margin-bottom: 14px; padding: 18px 16px 20px; border-radius: 20px; background: #fff; box-shadow: var(--card-shadow); }
 .sec-head { display: flex; align-items: center; gap: 12px; min-height: 36px; margin-bottom: 14px; }
 .sec-head h2 { flex: 1; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
@@ -177,12 +180,23 @@ input.plain { background: #f8f8fa; }
 .chip-btn.del { width: 100%; height: 50px; margin: 0 0 8px; justify-content: center; }
 
 /* нижняя панель сохранения */
-.save-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 10px 16px calc(10px + var(--safe-b)); background: #fff; box-shadow: 0 -1px 0 var(--sep); animation: slide-up .3s var(--ease); }
+.save-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 10px 16px calc(10px + var(--safe-b)); background: #fff; box-shadow: 0 -1px 0 var(--sep); }
+#app.enter .save-bar { animation: slide-up .3s var(--ease); } /* выезжает только при открытии экрана */
 .save-bar > div { display: flex; width: 100%; max-width: 528px; margin: 0 auto; }
 .save-bar .btn-main { flex: 1; }
 .save-inline { padding: 4px 0 26px; }
 .save-inline .btn-main { width: 100%; }
 body:has(.save-bar) #toast { bottom: calc(80px + var(--safe-b)); }
+
+/* место в базе */
+.usage-pct { font-size: 15px; font-weight: 600; color: var(--hint); font-variant-numeric: tabular-nums; }
+.usage-bar { height: 8px; overflow: hidden; border-radius: 4px; background: #ececf0; }
+.usage-bar i { display: block; height: 100%; border-radius: 4px; background: var(--text); transition: width .6s var(--ease); }
+.usage-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: 10px; font-size: 14px; }
+.usage-meta b { font-weight: 600; }
+.usage-meta span { color: var(--hint); }
+.usage.full .usage-bar i { background: var(--danger); }
+.usage.full .usage-pct { color: var(--danger); }
 
 /* администраторы */
 .adm-list { margin-top: -6px; }
@@ -204,5 +218,5 @@ body:has(.save-bar) #toast { bottom: calc(80px + var(--safe-b)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(#app.enter, #app.list-enter) :is(.o-list > *, .p-row), .save-bar { animation-name: fade-in; }
+  :is(#app.enter, #app.list-enter) :is(.o-list > *, .p-row), #app.enter .save-bar { animation-name: fade-in; }
 }
