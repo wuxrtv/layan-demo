@@ -1,16 +1,21 @@
-// POST /api/orders — заказ из магазина: проверка, пересчёт по ценам из базы, сохранение, уведомление в Telegram
+// POST /api/orders — заказ из магазина: проверка, пересчёт по ценам из базы, сохранение, уведомление в Telegram.
+// Заказы принимаются только из Telegram: подпись initData обязательна (в браузере магазин не работает).
 import { json, handle, readJson } from '../../lib/http.js';
 import { buildOrder, getSettings, listProducts } from '../../lib/store.js';
 import { botToken, notifyOrder, verifyInitData } from '../../lib/telegram.js';
 import { orderAllowed, orderKey, recordOrder } from '../../lib/ratelimit.js';
 
+const DEV_USER = { id: 0, username: '', first_name: 'Локальный режим' }; // только при локальном запуске (DEV_NO_AUTH=1)
+
 export const onRequestPost = handle(async ({ request, env, waitUntil }) => {
   const body = await readJson(request, 32 * 1024);
+  const tgUser = (await verifyInitData(body.initData, botToken(env))) || (env.DEV_NO_AUTH === '1' ? DEV_USER : null);
+  if (!tgUser) return json({ error: 'telegram' }, { status: 403 });
+  const who = orderKey(tgUser);
+  if (!(await orderAllowed(env.DB, who))) return json({ error: 'rate' }, { status: 429 });
+
   const [products, settings] = await Promise.all([listProducts(env.DB, { onlyActive: true }), getSettings(env.DB)]);
   const order = buildOrder(body, products, settings);
-  const tgUser = await verifyInitData(body.initData, botToken(env));
-  const who = await orderKey(request, tgUser);
-  if (!(await orderAllowed(env.DB, who))) return json({ error: 'rate' }, { status: 429 });
 
   const row = await env.DB.prepare(
     `INSERT INTO orders (name, phone, method, address, pay, comment, items, sum, fee, total, lang, tg_user)

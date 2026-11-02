@@ -735,7 +735,7 @@
         toast(t('fillRequired'), 'warn');
       } else {
         syncMain();
-        toast(t(data.error === 'rate' ? 'orderRate' : 'orderError'), 'warn');
+        toast(t({ rate: 'orderRate', telegram: 'orderTelegram' }[data.error] || 'orderError'), 'warn');
       }
       return;
     }
@@ -842,7 +842,25 @@
     ls.set('favs', state.favs);
   }
 
+  // Вне Telegram магазин не работает (заказы принимаются только с подписью Telegram) — ведём в бота.
+  // Локально (localhost) магазин открывается и в браузере, чтобы его можно было проверять.
+  const devHost = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  function viewTelegramOnly() {
+    return `
+      <div class="boot tg-only">
+        <img class="hero-logo" src="${S.logo.full}" alt="${esc(S.brand)}">
+        <h1>${t('tgOnlyTitle')}</h1>
+        <p>${t('tgOnlyText')}</p>
+        <a class="btn" href="https://t.me/${S.bot}" rel="noopener">${t('tgOnlyBtn')}</a>
+      </div>`;
+  }
+
   async function boot() {
+    if (!inTG && !devHost) {
+      hideMain();
+      $app.innerHTML = viewTelegramOnly();
+      return;
+    }
     $app.innerHTML = `<div class="boot"><img class="boot-logo" src="${S.logo.full}" alt="${S.brand}"><p>${t('loading')}</p></div>`;
     try {
       await loadCatalog();

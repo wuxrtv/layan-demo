@@ -315,6 +315,11 @@ body.has-tabbar.has-main #toast { bottom: calc(var(--tabbar-h) + 82px + var(--sa
 .boot { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; gap: 16px; text-align: center; color: var(--hint); }
 .boot-logo { width: 130px; height: auto; animation: breathe 1.6s ease-in-out infinite; }
 .boot p { margin: 0; max-width: 260px; }
+.tg-only { gap: 0; padding: 0 8px; animation: rise .45s var(--ease); }
+.tg-only .hero-logo { width: 150px; margin-bottom: 28px; }
+.tg-only h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+.tg-only p { max-width: 280px; font-size: 15px; line-height: 1.5; }
+.tg-only .btn { text-decoration: none; }
 
 /* ---------- анимации ---------- */
 @keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

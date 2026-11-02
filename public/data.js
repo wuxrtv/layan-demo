@@ -4,6 +4,7 @@
 window.STORE = {
   brand: 'LAYAN',
   logo: { full: 'assets/logo-full.webp', icon: 'assets/logo-icon.webp' },
+  bot: 'layan_shop_bot', // магазин работает только внутри Telegram — вне его ведём сюда
   currency: { ru: 'сум', uz: "so'm" },
   categories: [
     { id: 'all', ru: 'Все', uz: 'Hammasi' },
@@ -101,6 +102,10 @@ window.I18N = {
     orderError: "Не удалось отправить заказ. Попробуйте ещё раз.",
     orderStale: "Цены или товары изменились — проверьте корзину.",
     orderRate: "Слишком много заказов подряд. Попробуйте через несколько минут.",
+    orderTelegram: "Откройте магазин заново кнопкой «Магазин» в боте и повторите заказ.",
+    tgOnlyTitle: "Магазин работает в Telegram",
+    tgOnlyText: "Каталог, корзина и оформление заказа — в нашем Telegram-боте.",
+    tgOnlyBtn: "Открыть в Telegram",
   },
   uz: {
     tagline: "oilaviy kiyim do'koni",
@@ -185,5 +190,9 @@ window.I18N = {
     orderError: "Buyurtmani yuborib bo'lmadi. Qayta urinib ko'ring.",
     orderStale: "Narxlar yoki mahsulotlar o'zgardi — savatni tekshiring.",
     orderRate: "Ketma-ket juda ko‘p buyurtma. Bir necha daqiqadan so‘ng urinib ko‘ring.",
+    orderTelegram: "Do‘konni botdagi «Магазин» tugmasi orqali qayta oching va buyurtmani takrorlang.",
+    tgOnlyTitle: "Do‘kon Telegramda ishlaydi",
+    tgOnlyText: "Katalog, savat va buyurtma berish — Telegram-botimizda.",
+    tgOnlyBtn: "Telegramda ochish",
   },
 };
