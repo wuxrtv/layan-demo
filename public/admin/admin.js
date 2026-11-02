@@ -23,6 +23,7 @@
   const esc =(s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => String(n ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' сум';
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  const groupDigits = (v) => String(v ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
   // как в магазине: ID фото Unsplash → ссылка нужного размера, свои фото (/img/...) — как есть
   function photoUrl(src, w, h) {
@@ -48,7 +49,7 @@
   const state = {
     tab: 'orders',
     filter: 'new',
-    orders: [], counts: {}, ordersLoaded: false,
+    orders: [], counts: {}, ordersLoaded: false, ordersFor: null, // ordersFor — для какого фильтра загружен список
     products: [], productsLoaded: false, query: '',
     settings: null, me: null,
     draft: null, draftId: null, dirty: false, // редактируемый товар
@@ -149,22 +150,32 @@
       .join('');
   }
 
-  // анимация появления — только когда сменился экран, а не при каждой перерисовке
-  let lastView = '', enterTimer;
+  // Анимация — один раз: при смене экрана появляется весь экран (enter),
+  // при приходе новых данных (другой фильтр, загрузка) — только список (list-enter).
+  // Обычные перерисовки (переключатели, ввод, автообновление) ничего не анимируют.
+  let lastScreen = '', lastData = '', enterTimer;
   function render() {
     if (blocked) return;
     renderNav();
+    const seg = $app.querySelector('.seg');
+    const segX = seg ? seg.scrollLeft : 0;
     if (state.tab === 'orders') $app.innerHTML = viewOrders();
     else if (state.tab === 'products') $app.innerHTML = state.draft ? viewEditor() : viewProducts();
     else $app.innerHTML = viewSettings();
-    const view = [state.tab, state.filter, state.ordersLoaded, state.productsLoaded, !!state.draft, !!state.settingsDraft].join();
-    if (view !== lastView) {
-      lastView = view;
-      $app.classList.remove('enter');
+    const newSeg = $app.querySelector('.seg');
+    if (newSeg) newSeg.scrollLeft = segX;
+
+    const screen = [state.tab, !!state.draft].join();
+    const data = [state.ordersFor, state.productsLoaded, !!state.settingsDraft].join();
+    const cls = screen !== lastScreen ? 'enter' : data !== lastData ? 'list-enter' : '';
+    lastScreen = screen;
+    lastData = data;
+    if (cls) {
+      $app.classList.remove('enter', 'list-enter');
       void $app.offsetWidth;
-      $app.classList.add('enter');
+      $app.classList.add(cls);
       clearTimeout(enterTimer);
-      enterTimer = setTimeout(() => $app.classList.remove('enter'), 700);
+      enterTimer = setTimeout(() => $app.classList.remove('enter', 'list-enter'), 700);
     }
   }
 
@@ -190,12 +201,15 @@
 
   // ---------- заказы ----------
   async function loadOrders(silent) {
+    const filter = state.filter;
     try {
-      const data = await api('/orders' + (state.filter === 'all' ? '' : '?status=' + state.filter));
+      const data = await api('/orders' + (filter === 'all' ? '' : '?status=' + filter));
+      if (filter !== state.filter) return; // пока грузили, выбрали другой фильтр
       const hadNew = state.counts.new || 0;
       state.orders = data.orders;
       state.counts = data.counts;
       state.ordersLoaded = true;
+      state.ordersFor = filter;
       if (silent && (state.counts.new || 0) > hadNew) toast('Новый заказ');
       if (state.tab === 'orders' || !silent) render();
       else renderNav();
@@ -241,10 +255,11 @@
       : state.orders.length
         ? state.orders.map(orderCard).join('')
         : `<div class="adm-empty">${state.filter === 'new' ? 'Новых заказов нет' : 'Здесь пока пусто'}</div>`;
+    // пока грузится другой фильтр, старый список остаётся на месте (приглушённым) — без мигания
     return `
       <div class="adm-title"><h1>Заказы</h1></div>
       <div class="seg">${chips}</div>
-      <div class="o-list">${list}</div>`;
+      <div class="o-list ${state.ordersLoaded && state.ordersFor !== state.filter ? 'busy' : ''}">${list}</div>`;
   }
 
   // ---------- товары ----------
@@ -305,6 +320,9 @@
 
   const field = (label, path, attrs = '', type = 'text') =>
     `<label class="f"><span>${label}</span><input type="${type}" data-bind="${path}" value="${esc(getAt(state.draft, path) ?? '')}" ${attrs}></label>`;
+  // сумма: показываем «329 000» и «сум» внутри поля, на сервер уходят только цифры
+  const sumField = (label, attr, path, value, placeholder = '') =>
+    `<label class="f f-sum"><span>${label}</span><span class="sum-wrap"><input ${attr}="${path}" data-num="1" inputmode="numeric" autocomplete="off" value="${esc(groupDigits(value))}" placeholder="${placeholder}"><i>сум</i></span></label>`;
   const area = (label, path) =>
     `<label class="f"><span>${label}</span><textarea data-bind="${path}" maxlength="1500">${esc(getAt(state.draft, path) ?? '')}</textarea></label>`;
 
@@ -327,8 +345,8 @@
         <div class="color-fields">
           <div class="f-2">${field('Цвет RU', `colors.${i}.ru`, 'maxlength="40" placeholder="Чёрный"')}${field('Цвет UZ', `colors.${i}.uz`, 'maxlength="40" placeholder="Qora"')}</div>
           <div class="color-tools">
-            <input type="color" data-bind="colors.${i}.hex" value="${esc(c.hex)}" aria-label="Оттенок цвета">
-            ${d.colors.length > 1 ? `<button class="link danger" data-act="rm-color" data-i="${i}">Убрать</button>` : ''}
+            <label class="swatch"><input type="color" data-bind="colors.${i}.hex" value="${esc(c.hex)}"><i style="background:${esc(c.hex)}"></i>Оттенок</label>
+            ${d.colors.length > 1 ? `<button class="chip-btn danger" data-act="rm-color" data-i="${i}">Убрать</button>` : ''}
           </div>
         </div>
       </div>`).join('');
@@ -344,8 +362,8 @@
         ${field('Название UZ', 'name.uz', 'maxlength="120" placeholder="Maksi ko‘ylak"')}
         <label class="f"><span>Категория</span><select data-bind="cat">${Object.entries(CATS).map(([v, l]) => `<option value="${v}" ${d.cat === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <div class="f-2">
-          ${field('Цена, сум', 'price', 'inputmode="numeric" placeholder="459000"')}
-          ${field('Старая цена', 'oldPrice', 'inputmode="numeric" placeholder="—"')}
+          ${sumField('Цена', 'data-bind', 'price', d.price, '459 000')}
+          ${sumField('Старая цена', 'data-bind', 'oldPrice', d.oldPrice, 'нет')}
         </div>
         <div class="check"><span>Новинка</span><button class="switch ${d.tags.includes('new') ? 'on' : ''}" data-act="tag-new" aria-label="Новинка" aria-pressed="${d.tags.includes('new')}"></button></div>
         <div class="check"><span>Показывать в магазине</span><button class="switch ${d.active ? 'on' : ''}" data-act="draft-active" aria-label="Показывать в магазине" aria-pressed="${d.active}"></button></div>
@@ -354,7 +372,7 @@
       <section class="form-sec">
         <h2>Цвета</h2>
         ${colorRows}
-        <button class="link" data-act="add-color">Добавить цвет</button>
+        <button class="btn-line add-row" data-act="add-color">+ Добавить цвет</button>
       </section>
 
       <section class="form-sec">
@@ -373,7 +391,7 @@
         ${area('UZ', 'desc.uz')}
       </section>
 
-      ${state.draftId ? '<button class="link danger del" data-act="delete">Удалить товар</button>' : ''}
+      ${state.draftId ? '<button class="btn-line danger del" data-act="delete">Удалить товар</button>' : ''}
 
       <div class="save-bar"><div>
         <button class="btn-main" data-act="save" ${state.saving ? 'disabled' : ''}>${state.saving ? 'Сохраняем…' : 'Сохранить'}</button>
@@ -435,7 +453,7 @@
 
       <section class="form-sec">
         <h2>Доставка</h2>
-        <div class="f-2">${sf('Стоимость, сум', 'deliveryFee', 'inputmode="numeric"')}${sf('Бесплатно от, сум', 'freeFrom', 'inputmode="numeric"')}</div>
+        <div class="f-2">${sumField('Стоимость', 'data-sbind', 'deliveryFee', s.deliveryFee, '25 000')}${sumField('Бесплатно от', 'data-sbind', 'freeFrom', s.freeFrom, '500 000')}</div>
       </section>
 
       <section class="form-sec">
@@ -549,7 +567,12 @@
         if (d.v === 'products' && !state.productsLoaded) loadProducts();
         if (d.v === 'settings') loadSettings();
         break;
-      case 'filter': state.filter = d.v; state.ordersLoaded = false; render(); loadOrders(); break;
+      case 'filter':
+        if (state.filter === d.v) break;
+        state.filter = d.v;
+        render();
+        loadOrders();
+        break;
       case 'status':
         try {
           await api('/orders/' + d.id, { method: 'PATCH', body: { status: d.v } });
@@ -608,6 +631,14 @@
 
   document.addEventListener('input', (ev) => {
     const el = ev.target;
+    if (el.dataset.num) {
+      // расставляем пробелы между тысячами, курсор остаётся после той же цифры
+      const digitsBefore = el.value.slice(0, el.selectionStart).replace(/\D/g, '').length;
+      el.value = groupDigits(el.value);
+      let pos = 0;
+      for (let n = 0; pos < el.value.length && n < digitsBefore; pos++) if (/\d/.test(el.value[pos])) n++;
+      el.setSelectionRange(pos, pos);
+    }
     if (el.id === 'pq') {
       state.query = el.value;
       const pos = el.selectionStart;
@@ -617,6 +648,7 @@
       q.setSelectionRange(pos, pos);
       return;
     }
+    if (el.type === 'color' && el.nextElementSibling) el.nextElementSibling.style.background = el.value;
     if (el.dataset.bind && state.draft) {
       setAt(state.draft, el.dataset.bind, el.value);
       state.dirty = true;
