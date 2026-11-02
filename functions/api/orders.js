@@ -2,12 +2,15 @@
 import { json, handle, readJson } from '../../lib/http.js';
 import { buildOrder, getSettings, listProducts } from '../../lib/store.js';
 import { botToken, notifyOrder, verifyInitData } from '../../lib/telegram.js';
+import { orderAllowed, orderKey, recordOrder } from '../../lib/ratelimit.js';
 
 export const onRequestPost = handle(async ({ request, env, waitUntil }) => {
   const body = await readJson(request, 32 * 1024);
   const [products, settings] = await Promise.all([listProducts(env.DB, { onlyActive: true }), getSettings(env.DB)]);
   const order = buildOrder(body, products, settings);
   const tgUser = await verifyInitData(body.initData, botToken(env));
+  const who = await orderKey(request, tgUser);
+  if (!(await orderAllowed(env.DB, who))) return json({ error: 'rate' }, { status: 429 });
 
   const row = await env.DB.prepare(
     `INSERT INTO orders (name, phone, method, address, pay, comment, items, sum, fee, total, lang, tg_user)
@@ -17,6 +20,7 @@ export const onRequestPost = handle(async ({ request, env, waitUntil }) => {
       order.sum, order.fee, order.total, order.lang, tgUser ? JSON.stringify(tgUser) : null)
     .first();
 
+  await recordOrder(env.DB, who);
   const no = 1000 + row.id;
   waitUntil(notifyOrder(env, no, order, tgUser).catch((e) => console.error('notify', e)));
   return json({ no, sum: order.sum, fee: order.fee, total: order.total, method: order.method, pay: order.pay, count: order.items.reduce((s, i) => s + i.qty, 0) });

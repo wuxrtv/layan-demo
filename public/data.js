@@ -100,6 +100,7 @@ window.I18N = {
     sending: "Отправляем заказ…",
     orderError: "Не удалось отправить заказ. Попробуйте ещё раз.",
     orderStale: "Цены или товары изменились — проверьте корзину.",
+    orderRate: "Слишком много заказов подряд. Попробуйте через несколько минут.",
   },
   uz: {
     tagline: "oilaviy kiyim do'koni",
@@ -183,5 +184,6 @@ window.I18N = {
     sending: "Buyurtma yuborilmoqda…",
     orderError: "Buyurtmani yuborib bo'lmadi. Qayta urinib ko'ring.",
     orderStale: "Narxlar yoki mahsulotlar o'zgardi — savatni tekshiring.",
+    orderRate: "Ketma-ket juda ko‘p buyurtma. Bir necha daqiqadan so‘ng urinib ko‘ring.",
   },
 };

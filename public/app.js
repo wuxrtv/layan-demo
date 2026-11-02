@@ -735,7 +735,7 @@
         toast(t('fillRequired'), 'warn');
       } else {
         syncMain();
-        toast(t('orderError'), 'warn');
+        toast(t(data.error === 'rate' ? 'orderRate' : 'orderError'), 'warn');
       }
       return;
     }
